@@ -9,8 +9,8 @@ from __future__ import annotations
 import json
 
 from . import decision as decision_rules
+from . import scene
 from . import tactical as tactical_rules
-from .describe import channel, relative_direction, third
 
 
 def tactical_context(geometry: dict, situation: dict) -> str:
@@ -42,35 +42,28 @@ def decision(geometry: dict, mode: str | None = None) -> str:
 
 
 def field_mapper(scenario: dict, frame: dict, geometry: dict) -> str:
-    teams = scenario["teams"]
-    me = geometry["selected"]
-    attacking = geometry["attacking"]
-    my_team = teams[me["team"]]["name"]
-    other_team = next(t["name"] for key, t in teams.items() if key != me["team"])
-    players = {p["id"]: p for p in frame["players"]}
+    """Offline description, worded from the same measured facts the agent gets."""
+    measured = scene.facts(scenario, frame, geometry)
+    me, ball = measured["selected"], measured["ball"]
+    other_team = next(t["name"] for key, t in scenario["teams"].items() if key != geometry["selected"]["team"])
 
-    owner = frame["ball"]["owner"]
     if me["has_ball"]:
-        ball_line = f"{my_team} #{me['id']} ({me['role']}) has the ball"
-    elif owner is None:
-        ball_line = f"The ball is travelling; {my_team} #{me['id']} ({me['role']}) is off the ball"
+        ball_line = f"{me['team']} #{me['id']} ({me['role']}) has the ball"
+    elif ball["holder"] is None:
+        ball_line = f"The ball is travelling; {me['team']} #{me['id']} ({me['role']}) is off the ball"
     else:
-        holder = players[owner]
-        ball_line = f"#{owner} ({teams[holder['team']]['name']}) has the ball; {my_team} #{me['id']} is off the ball"
-    bullets = [f"{ball_line}, in the {third(me['x'], attacking)}, {channel(me['y'], attacking)}."]
+        ball_line = f"#{ball['holder']} ({ball['holder_team']}) has the ball; {me['team']} #{me['id']} is off the ball"
+    bullets = [f"{ball_line}, in the {me['zone']}."]
 
-    near_mates = sorted(geometry["teammates"], key=lambda o: o["distance_m"])[:3]
     bullets.append("Nearest teammates: " + ", ".join(
-        f"#{o['id']} {o['distance_m']:.0f} m {relative_direction((me['x'], me['y']), (o['x'], o['y']), attacking)}"
-        for o in near_mates
+        f"#{o['id']} {o['distance_m']} m {o['direction']}" for o in measured["nearest_teammates"]
     ) + ".")
 
-    nearest = geometry["pressure"]["nearest_opponents"]
-    if nearest:
-        first = nearest[0]
+    if measured["nearest_opponents"]:
+        first = measured["nearest_opponents"][0]
         bullets.append(
-            f"Closest {other_team} player: #{first['id']} at {first['distance_m']:.0f} m "
-            f"({geometry['pressure']['level']} pressure)."
+            f"Closest {other_team} player: #{first['id']} at {first['distance_m']} m "
+            f"({measured['pressure']} pressure)."
         )
 
     blocked = [o for o in geometry["teammates"] if not o["lane_open"]]
@@ -79,9 +72,9 @@ def field_mapper(scenario: dict, frame: dict, geometry: dict) -> str:
             f"to #{o['id']} (#{', #'.join(map(str, o['blocked_by']))} in line)" for o in blocked[:3]
         ) + ".")
 
-    space = geometry["free_space"]
+    space = measured["free_space"]
     bullets.append(
-        f"Largest open area within 15 m ahead: {channel(space['y'], attacking)}, "
-        f"about {space['space_m']:.0f} m from the nearest opponent."
+        f"Largest open area within {space['searched_within_m']} m ahead: {space['zone']}, "
+        f"about {space['room_from_nearest_opponent_m']} m from the nearest opponent."
     )
     return "\n".join(f"- {b}" for b in bullets)

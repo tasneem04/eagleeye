@@ -33,9 +33,10 @@ Follow the tactical mode:
 If no tactical context is given, pick the mode yourself.
 
 Rules:
+- If selected.has_ball is false, choose what the player should do the moment the ball arrives.
 - You may ONLY pass to a player id listed in open_teammates. Never pass to a blocked or marked player.
 - For a third-man combination, pass to the link player (the middle id), not the runner.
-- Dribble only if free_space.space_m is large and pressure is not high.
+- Dribble only if free_space.space_m is at least 8 and pressure.level is not "high".
 - scan_cue = what the player should have looked at BEFORE receiving the ball (the scanning habit).
 - Write reason and scan_cue in simple words for a young player, using player numbers only (never names).
 

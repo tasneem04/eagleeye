@@ -20,7 +20,7 @@ from dataclasses import asdict, dataclass
 
 from azure.core.exceptions import ClientAuthenticationError, HttpResponseError
 
-from . import decision, messages, mock, tactical
+from . import decision, messages, mock, scene, tactical
 
 log = logging.getLogger("eagleeye.pipeline")
 
@@ -95,9 +95,16 @@ class Pipeline:
         enabled = {s.key: s for s in self.stages}
 
         def field_mapper():
-            text = messages.field_mapper_input(scenario, frame, player_id)
-            return self._run_stage(enabled["field_mapper"], text, lambda: mock.field_mapper(scenario, frame, geometry),
-                                   offline)
+            measured = scene.facts(scenario, frame, geometry)
+            text = messages.field_mapper_input(scenario, frame, player_id, measured)
+            fallback = lambda: mock.field_mapper(scenario, frame, geometry)  # noqa: E731
+            result = self._run_stage(enabled["field_mapper"], text, fallback, offline)
+            ok, note = scene.check(result.output, measured, frame) if result.source == "foundry" else (True, None)
+            if not ok:
+                # A wrong distance here would also mislead DecisionAgent, which reads this text next.
+                result.output = fallback()
+            result.data = {"verified": ok, "note": note}
+            return result
 
         def tactical_context():
             text = messages.tactical_input(scenario, geometry, situation)

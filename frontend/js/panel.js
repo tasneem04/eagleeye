@@ -177,7 +177,8 @@ function agentCards(config, selection) {
 function stageBody(result) {
   if (result.key === 'decision' && result.data) return decisionBody(result.data);
   if (result.key === 'tactical_context' && result.data) return tacticalBody(result.data);
-  return formatAgentText(result.output);
+  const note = result.data?.note ? `<div class="warning">${esc(result.data.note)}</div>` : '';
+  return note + formatAgentText(result.output);
 }
 
 function tacticalBody(t) {

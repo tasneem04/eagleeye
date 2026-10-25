@@ -11,7 +11,8 @@ import json
 from . import tactical
 
 
-def field_mapper_input(scenario: dict, frame: dict, player_id: int) -> str:
+def field_mapper_input(scenario: dict, frame: dict, player_id: int, measured: dict) -> str:
+    """`measured` is `scene.facts()`: the agent words these numbers and never calculates its own."""
     teams = scenario["teams"]
     directions = scenario["attacking_direction"]
     player = next(p for p in frame["players"] if p["id"] == player_id)
@@ -30,7 +31,11 @@ def field_mapper_input(scenario: dict, frame: dict, player_id: int) -> str:
         "(1 x-unit = 1.05 m, 1 y-unit = 0.68 m). y=0 is the top touchline as drawn.",
         "All data is synthetic. Player ids are shirt numbers.",
         "",
-        "Moment JSON:",
+        "Measured by code (distances in whole metres, directions from the selected player's point of view; "
+        "use these exactly):",
+        json.dumps(measured, separators=(",", ":")),
+        "",
+        "Moment JSON (for reference only; do not calculate distances or directions from it):",
         json.dumps(frame, separators=(",", ":")),
     ]
     return "\n".join(lines)
