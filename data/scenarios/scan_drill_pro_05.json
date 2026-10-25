@@ -1,0 +1,378 @@
+{
+  "id": "scan_drill_pro_05",
+  "title": "Pro scan drill 5",
+  "description": "Rondo-style drill. #6 plays the ball to #8. Scan before it arrives and find the free player.",
+  "synthetic": true,
+  "teams": {
+    "home": {
+      "name": "Blue"
+    },
+    "away": {
+      "name": "Red"
+    }
+  },
+  "attacking_direction": {
+    "home": "right",
+    "away": "left"
+  },
+  "key_frame": 3,
+  "match_situation": {
+    "minute": 50,
+    "score": {
+      "home": 0,
+      "away": 0
+    }
+  },
+  "frames": [
+    {
+      "time": 0.0,
+      "ball": {
+        "x": 40.3,
+        "y": 69.7,
+        "owner": 6
+      },
+      "players": [
+        {
+          "id": 6,
+          "team": "home",
+          "x": 39.4,
+          "y": 69.7,
+          "role": "defensive midfielder"
+        },
+        {
+          "id": 8,
+          "team": "home",
+          "x": 54.6,
+          "y": 62.5,
+          "role": "central midfielder"
+        },
+        {
+          "id": 10,
+          "team": "home",
+          "x": 60.0,
+          "y": 44.3,
+          "role": "attacking midfielder"
+        },
+        {
+          "id": 4,
+          "team": "home",
+          "x": 44.8,
+          "y": 72.1,
+          "role": "centre back"
+        },
+        {
+          "id": 11,
+          "team": "home",
+          "x": 44.8,
+          "y": 45.7,
+          "role": "full back"
+        },
+        {
+          "id": 14,
+          "team": "away",
+          "x": 43.2,
+          "y": 71.6,
+          "role": "central midfielder"
+        },
+        {
+          "id": 15,
+          "team": "away",
+          "x": 43.4,
+          "y": 45.0,
+          "role": "central midfielder"
+        },
+        {
+          "id": 16,
+          "team": "away",
+          "x": 50.3,
+          "y": 63.6,
+          "role": "striker"
+        },
+        {
+          "id": 17,
+          "team": "away",
+          "x": 68.8,
+          "y": 53.8,
+          "role": "centre back"
+        },
+        {
+          "id": 18,
+          "team": "away",
+          "x": 57.8,
+          "y": 75.8,
+          "role": "wide midfielder"
+        },
+        {
+          "id": 19,
+          "team": "away",
+          "x": 56.9,
+          "y": 35.6,
+          "role": "defensive midfielder"
+        }
+      ]
+    },
+    {
+      "time": 1.4,
+      "ball": {
+        "x": 41.7,
+        "y": 69.1,
+        "owner": 6
+      },
+      "players": [
+        {
+          "id": 6,
+          "team": "home",
+          "x": 40.8,
+          "y": 69.1,
+          "role": "defensive midfielder"
+        },
+        {
+          "id": 8,
+          "team": "home",
+          "x": 54.6,
+          "y": 62.5,
+          "role": "central midfielder"
+        },
+        {
+          "id": 10,
+          "team": "home",
+          "x": 60.0,
+          "y": 44.3,
+          "role": "attacking midfielder"
+        },
+        {
+          "id": 4,
+          "team": "home",
+          "x": 44.8,
+          "y": 72.1,
+          "role": "centre back"
+        },
+        {
+          "id": 11,
+          "team": "home",
+          "x": 44.8,
+          "y": 45.7,
+          "role": "full back"
+        },
+        {
+          "id": 14,
+          "team": "away",
+          "x": 43.2,
+          "y": 71.6,
+          "role": "central midfielder"
+        },
+        {
+          "id": 15,
+          "team": "away",
+          "x": 43.4,
+          "y": 45.0,
+          "role": "central midfielder"
+        },
+        {
+          "id": 16,
+          "team": "away",
+          "x": 51.2,
+          "y": 63.3,
+          "role": "striker"
+        },
+        {
+          "id": 17,
+          "team": "away",
+          "x": 68.8,
+          "y": 53.8,
+          "role": "centre back"
+        },
+        {
+          "id": 18,
+          "team": "away",
+          "x": 57.8,
+          "y": 75.8,
+          "role": "wide midfielder"
+        },
+        {
+          "id": 19,
+          "team": "away",
+          "x": 56.9,
+          "y": 35.6,
+          "role": "defensive midfielder"
+        }
+      ]
+    },
+    {
+      "time": 2.6,
+      "ball": {
+        "x": 47.7,
+        "y": 65.8,
+        "owner": null
+      },
+      "players": [
+        {
+          "id": 6,
+          "team": "home",
+          "x": 40.8,
+          "y": 69.1,
+          "role": "defensive midfielder"
+        },
+        {
+          "id": 8,
+          "team": "home",
+          "x": 54.6,
+          "y": 62.5,
+          "role": "central midfielder"
+        },
+        {
+          "id": 10,
+          "team": "home",
+          "x": 60.4,
+          "y": 43.0,
+          "role": "attacking midfielder"
+        },
+        {
+          "id": 4,
+          "team": "home",
+          "x": 44.8,
+          "y": 72.1,
+          "role": "centre back"
+        },
+        {
+          "id": 11,
+          "team": "home",
+          "x": 44.8,
+          "y": 45.7,
+          "role": "full back"
+        },
+        {
+          "id": 14,
+          "team": "away",
+          "x": 43.2,
+          "y": 71.6,
+          "role": "central midfielder"
+        },
+        {
+          "id": 15,
+          "team": "away",
+          "x": 43.4,
+          "y": 45.0,
+          "role": "central midfielder"
+        },
+        {
+          "id": 16,
+          "team": "away",
+          "x": 52.3,
+          "y": 63.1,
+          "role": "striker"
+        },
+        {
+          "id": 17,
+          "team": "away",
+          "x": 68.8,
+          "y": 53.8,
+          "role": "centre back"
+        },
+        {
+          "id": 18,
+          "team": "away",
+          "x": 57.8,
+          "y": 75.8,
+          "role": "wide midfielder"
+        },
+        {
+          "id": 19,
+          "team": "away",
+          "x": 56.9,
+          "y": 35.6,
+          "role": "defensive midfielder"
+        }
+      ]
+    },
+    {
+      "time": 3.6,
+      "ball": {
+        "x": 55.5,
+        "y": 62.5,
+        "owner": 8
+      },
+      "players": [
+        {
+          "id": 6,
+          "team": "home",
+          "x": 40.8,
+          "y": 69.1,
+          "role": "defensive midfielder"
+        },
+        {
+          "id": 8,
+          "team": "home",
+          "x": 54.6,
+          "y": 62.5,
+          "role": "central midfielder"
+        },
+        {
+          "id": 10,
+          "team": "home",
+          "x": 60.4,
+          "y": 43.0,
+          "role": "attacking midfielder"
+        },
+        {
+          "id": 4,
+          "team": "home",
+          "x": 44.8,
+          "y": 72.1,
+          "role": "centre back"
+        },
+        {
+          "id": 11,
+          "team": "home",
+          "x": 44.8,
+          "y": 45.7,
+          "role": "full back"
+        },
+        {
+          "id": 14,
+          "team": "away",
+          "x": 43.2,
+          "y": 71.6,
+          "role": "central midfielder"
+        },
+        {
+          "id": 15,
+          "team": "away",
+          "x": 43.4,
+          "y": 45.0,
+          "role": "central midfielder"
+        },
+        {
+          "id": 16,
+          "team": "away",
+          "x": 53.1,
+          "y": 62.9,
+          "role": "striker"
+        },
+        {
+          "id": 17,
+          "team": "away",
+          "x": 68.8,
+          "y": 53.8,
+          "role": "centre back"
+        },
+        {
+          "id": 18,
+          "team": "away",
+          "x": 57.8,
+          "y": 75.8,
+          "role": "wide midfielder"
+        },
+        {
+          "id": 19,
+          "team": "away",
+          "x": 56.9,
+          "y": 35.6,
+          "role": "defensive midfielder"
+        }
+      ]
+    }
+  ],
+  "kind": "drill",
+  "level": "pro"
+}

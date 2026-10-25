@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1220">
+  <title>EagleEye · UI concepts</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="mockups.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="EagleEye home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="16" cy="16" r="4" fill="currentColor"/></svg>
+      </span>
+      <span><strong>EagleEye</strong><small>See the pitch before the ball arrives</small></span>
+    </a>
+    <a class="back-link" href="/">← Back to app</a>
+  </header>
+
+  <main>
+    <section class="intro">
+      <div class="eyebrow"><span></span> PRODUCT DESIGN · 3 DIRECTIONS</div>
+      <h1>Three ways to see the game.</h1>
+      <p>Same moment. Different coaching experience. Choose a direction to preview how EagleEye could feel.</p>
+    </section>
+
+    <nav class="concept-tabs" aria-label="Choose a UI concept">
+      <button class="concept-tab active" type="button" data-concept="academy" aria-pressed="true">
+        <span class="tab-number">01</span><span><strong>Academy Mode</strong><small>Learn by spotting it</small></span>
+      </button>
+      <button class="concept-tab" type="button" data-concept="touchline" aria-pressed="false">
+        <span class="tab-number">02</span><span><strong>Coach’s Touchline</strong><small>One clear next action</small></span>
+      </button>
+      <button class="concept-tab" type="button" data-concept="workbench" aria-pressed="false">
+        <span class="tab-number">03</span><span><strong>Tactical Workbench</strong><small>Depth for analysts</small></span>
+      </button>
+      <button class="concept-tab" type="button" data-concept="broadcast" aria-pressed="false">
+        <span class="tab-number">04</span><span><strong>Matchday Live</strong><small>Broadcast energy</small></span>
+      </button>
+      <button class="concept-tab" type="button" data-concept="player" aria-pressed="false">
+        <span class="tab-number">05</span><span><strong>Player’s POV</strong><small>Think from the shirt</small></span>
+      </button>
+      <button class="concept-tab" type="button" data-concept="review" aria-pressed="false">
+        <span class="tab-number">06</span><span><strong>Session Review</strong><small>See how you improve</small></span>
+      </button>
+    </nav>
+
+    <div class="concept-summary" id="concept-summary" aria-live="polite"></div>
+    <section id="mockup" class="mockup" aria-label="Selected design concept preview"></section>
+
+    <footer class="decision-note">
+      <span class="note-icon" aria-hidden="true">i</span>
+      <p><strong>These are visual prototypes, not final behavior.</strong> The pitch moment and coaching data are illustrative. Pick a direction and I’ll carry it into the real interface.</p>
+    </footer>
+  </main>
+  <script type="module" src="js/mockups.js"></script>
+</body>
+</html>

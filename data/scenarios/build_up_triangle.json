@@ -1,0 +1,1340 @@
+{
+  "id": "build_up_triangle",
+  "title": "Build-up: find the free triangle",
+  "description": "Blue #6 receives from the centre back while Red's strikers press. The pass into #10 is cut off, so where is the free option?",
+  "synthetic": true,
+  "teams": {
+    "home": {
+      "name": "Blue"
+    },
+    "away": {
+      "name": "Red"
+    }
+  },
+  "attacking_direction": {
+    "home": "right",
+    "away": "left"
+  },
+  "key_frame": 3,
+  "match_situation": {
+    "minute": 63,
+    "score": {
+      "home": 0,
+      "away": 0
+    }
+  },
+  "frames": [
+    {
+      "time": 0.0,
+      "ball": {
+        "x": 22.9,
+        "y": 38,
+        "owner": 4
+      },
+      "players": [
+        {
+          "id": 1,
+          "team": "home",
+          "x": 6,
+          "y": 50,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 2,
+          "team": "home",
+          "x": 30,
+          "y": 82,
+          "role": "right back"
+        },
+        {
+          "id": 5,
+          "team": "home",
+          "x": 22,
+          "y": 62,
+          "role": "centre back"
+        },
+        {
+          "id": 4,
+          "team": "home",
+          "x": 22,
+          "y": 38,
+          "role": "centre back"
+        },
+        {
+          "id": 3,
+          "team": "home",
+          "x": 30,
+          "y": 18,
+          "role": "left back"
+        },
+        {
+          "id": 6,
+          "team": "home",
+          "x": 36,
+          "y": 50,
+          "role": "defensive midfielder"
+        },
+        {
+          "id": 8,
+          "team": "home",
+          "x": 47,
+          "y": 64,
+          "role": "central midfielder"
+        },
+        {
+          "id": 10,
+          "team": "home",
+          "x": 49,
+          "y": 36,
+          "role": "attacking midfielder"
+        },
+        {
+          "id": 7,
+          "team": "home",
+          "x": 64,
+          "y": 86,
+          "role": "right winger"
+        },
+        {
+          "id": 11,
+          "team": "home",
+          "x": 64,
+          "y": 14,
+          "role": "left winger"
+        },
+        {
+          "id": 9,
+          "team": "home",
+          "x": 70,
+          "y": 50,
+          "role": "striker"
+        },
+        {
+          "id": 12,
+          "team": "away",
+          "x": 95,
+          "y": 50,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 13,
+          "team": "away",
+          "x": 77,
+          "y": 20,
+          "role": "right back"
+        },
+        {
+          "id": 14,
+          "team": "away",
+          "x": 74,
+          "y": 42,
+          "role": "centre back"
+        },
+        {
+          "id": 15,
+          "team": "away",
+          "x": 74,
+          "y": 58,
+          "role": "centre back"
+        },
+        {
+          "id": 16,
+          "team": "away",
+          "x": 77,
+          "y": 80,
+          "role": "left back"
+        },
+        {
+          "id": 17,
+          "team": "away",
+          "x": 60,
+          "y": 18,
+          "role": "right midfielder"
+        },
+        {
+          "id": 18,
+          "team": "away",
+          "x": 57,
+          "y": 44,
+          "role": "central midfielder"
+        },
+        {
+          "id": 19,
+          "team": "away",
+          "x": 57,
+          "y": 58,
+          "role": "central midfielder"
+        },
+        {
+          "id": 20,
+          "team": "away",
+          "x": 60,
+          "y": 80,
+          "role": "left midfielder"
+        },
+        {
+          "id": 21,
+          "team": "away",
+          "x": 46,
+          "y": 44,
+          "role": "striker"
+        },
+        {
+          "id": 22,
+          "team": "away",
+          "x": 46,
+          "y": 58,
+          "role": "striker"
+        }
+      ]
+    },
+    {
+      "time": 1.2,
+      "ball": {
+        "x": 29,
+        "y": 44,
+        "owner": null
+      },
+      "players": [
+        {
+          "id": 1,
+          "team": "home",
+          "x": 6,
+          "y": 50,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 2,
+          "team": "home",
+          "x": 30,
+          "y": 82,
+          "role": "right back"
+        },
+        {
+          "id": 5,
+          "team": "home",
+          "x": 22,
+          "y": 62,
+          "role": "centre back"
+        },
+        {
+          "id": 4,
+          "team": "home",
+          "x": 22,
+          "y": 38,
+          "role": "centre back"
+        },
+        {
+          "id": 3,
+          "team": "home",
+          "x": 30,
+          "y": 18,
+          "role": "left back"
+        },
+        {
+          "id": 6,
+          "team": "home",
+          "x": 37,
+          "y": 50,
+          "role": "defensive midfielder"
+        },
+        {
+          "id": 8,
+          "team": "home",
+          "x": 47,
+          "y": 64,
+          "role": "central midfielder"
+        },
+        {
+          "id": 10,
+          "team": "home",
+          "x": 49,
+          "y": 36,
+          "role": "attacking midfielder"
+        },
+        {
+          "id": 7,
+          "team": "home",
+          "x": 64,
+          "y": 86,
+          "role": "right winger"
+        },
+        {
+          "id": 11,
+          "team": "home",
+          "x": 64,
+          "y": 14,
+          "role": "left winger"
+        },
+        {
+          "id": 9,
+          "team": "home",
+          "x": 70,
+          "y": 50,
+          "role": "striker"
+        },
+        {
+          "id": 12,
+          "team": "away",
+          "x": 95,
+          "y": 50,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 13,
+          "team": "away",
+          "x": 77,
+          "y": 20,
+          "role": "right back"
+        },
+        {
+          "id": 14,
+          "team": "away",
+          "x": 74,
+          "y": 42,
+          "role": "centre back"
+        },
+        {
+          "id": 15,
+          "team": "away",
+          "x": 74,
+          "y": 58,
+          "role": "centre back"
+        },
+        {
+          "id": 16,
+          "team": "away",
+          "x": 77,
+          "y": 80,
+          "role": "left back"
+        },
+        {
+          "id": 17,
+          "team": "away",
+          "x": 60,
+          "y": 18,
+          "role": "right midfielder"
+        },
+        {
+          "id": 18,
+          "team": "away",
+          "x": 57,
+          "y": 44,
+          "role": "central midfielder"
+        },
+        {
+          "id": 19,
+          "team": "away",
+          "x": 57,
+          "y": 58,
+          "role": "central midfielder"
+        },
+        {
+          "id": 20,
+          "team": "away",
+          "x": 60,
+          "y": 80,
+          "role": "left midfielder"
+        },
+        {
+          "id": 21,
+          "team": "away",
+          "x": 44,
+          "y": 46,
+          "role": "striker"
+        },
+        {
+          "id": 22,
+          "team": "away",
+          "x": 46,
+          "y": 50,
+          "role": "striker"
+        }
+      ]
+    },
+    {
+      "time": 2.2,
+      "ball": {
+        "x": 38.9,
+        "y": 51,
+        "owner": 6
+      },
+      "players": [
+        {
+          "id": 1,
+          "team": "home",
+          "x": 6,
+          "y": 50,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 2,
+          "team": "home",
+          "x": 34,
+          "y": 84,
+          "role": "right back"
+        },
+        {
+          "id": 5,
+          "team": "home",
+          "x": 22,
+          "y": 62,
+          "role": "centre back"
+        },
+        {
+          "id": 4,
+          "team": "home",
+          "x": 24,
+          "y": 36,
+          "role": "centre back"
+        },
+        {
+          "id": 3,
+          "team": "home",
+          "x": 30,
+          "y": 18,
+          "role": "left back"
+        },
+        {
+          "id": 6,
+          "team": "home",
+          "x": 38,
+          "y": 51,
+          "role": "defensive midfielder"
+        },
+        {
+          "id": 8,
+          "team": "home",
+          "x": 49,
+          "y": 64,
+          "role": "central midfielder"
+        },
+        {
+          "id": 10,
+          "team": "home",
+          "x": 49,
+          "y": 36,
+          "role": "attacking midfielder"
+        },
+        {
+          "id": 7,
+          "team": "home",
+          "x": 64,
+          "y": 86,
+          "role": "right winger"
+        },
+        {
+          "id": 11,
+          "team": "home",
+          "x": 64,
+          "y": 14,
+          "role": "left winger"
+        },
+        {
+          "id": 9,
+          "team": "home",
+          "x": 70,
+          "y": 50,
+          "role": "striker"
+        },
+        {
+          "id": 12,
+          "team": "away",
+          "x": 95,
+          "y": 50,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 13,
+          "team": "away",
+          "x": 77,
+          "y": 20,
+          "role": "right back"
+        },
+        {
+          "id": 14,
+          "team": "away",
+          "x": 72,
+          "y": 46,
+          "role": "centre back"
+        },
+        {
+          "id": 15,
+          "team": "away",
+          "x": 72,
+          "y": 55,
+          "role": "centre back"
+        },
+        {
+          "id": 16,
+          "team": "away",
+          "x": 77,
+          "y": 80,
+          "role": "left back"
+        },
+        {
+          "id": 17,
+          "team": "away",
+          "x": 60,
+          "y": 18,
+          "role": "right midfielder"
+        },
+        {
+          "id": 18,
+          "team": "away",
+          "x": 56,
+          "y": 46,
+          "role": "central midfielder"
+        },
+        {
+          "id": 19,
+          "team": "away",
+          "x": 56,
+          "y": 56,
+          "role": "central midfielder"
+        },
+        {
+          "id": 20,
+          "team": "away",
+          "x": 60,
+          "y": 80,
+          "role": "left midfielder"
+        },
+        {
+          "id": 21,
+          "team": "away",
+          "x": 43,
+          "y": 48,
+          "role": "striker"
+        },
+        {
+          "id": 22,
+          "team": "away",
+          "x": 45,
+          "y": 45,
+          "role": "striker"
+        }
+      ]
+    },
+    {
+      "time": 3.0,
+      "ball": {
+        "x": 39.9,
+        "y": 51,
+        "owner": 6
+      },
+      "players": [
+        {
+          "id": 1,
+          "team": "home",
+          "x": 6,
+          "y": 50,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 2,
+          "team": "home",
+          "x": 36,
+          "y": 84,
+          "role": "right back"
+        },
+        {
+          "id": 5,
+          "team": "home",
+          "x": 22,
+          "y": 62,
+          "role": "centre back"
+        },
+        {
+          "id": 4,
+          "team": "home",
+          "x": 24,
+          "y": 36,
+          "role": "centre back"
+        },
+        {
+          "id": 3,
+          "team": "home",
+          "x": 30,
+          "y": 18,
+          "role": "left back"
+        },
+        {
+          "id": 6,
+          "team": "home",
+          "x": 39,
+          "y": 51,
+          "role": "defensive midfielder"
+        },
+        {
+          "id": 8,
+          "team": "home",
+          "x": 50,
+          "y": 64,
+          "role": "central midfielder"
+        },
+        {
+          "id": 10,
+          "team": "home",
+          "x": 50,
+          "y": 35,
+          "role": "attacking midfielder"
+        },
+        {
+          "id": 7,
+          "team": "home",
+          "x": 66,
+          "y": 86,
+          "role": "right winger"
+        },
+        {
+          "id": 11,
+          "team": "home",
+          "x": 64,
+          "y": 14,
+          "role": "left winger"
+        },
+        {
+          "id": 9,
+          "team": "home",
+          "x": 70,
+          "y": 50,
+          "role": "striker"
+        },
+        {
+          "id": 12,
+          "team": "away",
+          "x": 95,
+          "y": 50,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 13,
+          "team": "away",
+          "x": 77,
+          "y": 20,
+          "role": "right back"
+        },
+        {
+          "id": 14,
+          "team": "away",
+          "x": 72,
+          "y": 46,
+          "role": "centre back"
+        },
+        {
+          "id": 15,
+          "team": "away",
+          "x": 72,
+          "y": 55,
+          "role": "centre back"
+        },
+        {
+          "id": 16,
+          "team": "away",
+          "x": 77,
+          "y": 80,
+          "role": "left back"
+        },
+        {
+          "id": 17,
+          "team": "away",
+          "x": 60,
+          "y": 18,
+          "role": "right midfielder"
+        },
+        {
+          "id": 18,
+          "team": "away",
+          "x": 56,
+          "y": 46,
+          "role": "central midfielder"
+        },
+        {
+          "id": 19,
+          "team": "away",
+          "x": 56,
+          "y": 56,
+          "role": "central midfielder"
+        },
+        {
+          "id": 20,
+          "team": "away",
+          "x": 61,
+          "y": 80,
+          "role": "left midfielder"
+        },
+        {
+          "id": 21,
+          "team": "away",
+          "x": 42.5,
+          "y": 47,
+          "role": "striker"
+        },
+        {
+          "id": 22,
+          "team": "away",
+          "x": 45,
+          "y": 43,
+          "role": "striker"
+        }
+      ]
+    },
+    {
+      "time": 3.9,
+      "ball": {
+        "x": 46,
+        "y": 58,
+        "owner": null
+      },
+      "players": [
+        {
+          "id": 1,
+          "team": "home",
+          "x": 6,
+          "y": 50,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 2,
+          "team": "home",
+          "x": 36,
+          "y": 84,
+          "role": "right back"
+        },
+        {
+          "id": 5,
+          "team": "home",
+          "x": 22,
+          "y": 62,
+          "role": "centre back"
+        },
+        {
+          "id": 4,
+          "team": "home",
+          "x": 24,
+          "y": 36,
+          "role": "centre back"
+        },
+        {
+          "id": 3,
+          "team": "home",
+          "x": 30,
+          "y": 18,
+          "role": "left back"
+        },
+        {
+          "id": 6,
+          "team": "home",
+          "x": 40,
+          "y": 51,
+          "role": "defensive midfielder"
+        },
+        {
+          "id": 8,
+          "team": "home",
+          "x": 53,
+          "y": 63,
+          "role": "central midfielder"
+        },
+        {
+          "id": 10,
+          "team": "home",
+          "x": 50,
+          "y": 35,
+          "role": "attacking midfielder"
+        },
+        {
+          "id": 7,
+          "team": "home",
+          "x": 66,
+          "y": 86,
+          "role": "right winger"
+        },
+        {
+          "id": 11,
+          "team": "home",
+          "x": 64,
+          "y": 14,
+          "role": "left winger"
+        },
+        {
+          "id": 9,
+          "team": "home",
+          "x": 70,
+          "y": 50,
+          "role": "striker"
+        },
+        {
+          "id": 12,
+          "team": "away",
+          "x": 95,
+          "y": 50,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 13,
+          "team": "away",
+          "x": 77,
+          "y": 20,
+          "role": "right back"
+        },
+        {
+          "id": 14,
+          "team": "away",
+          "x": 72,
+          "y": 46,
+          "role": "centre back"
+        },
+        {
+          "id": 15,
+          "team": "away",
+          "x": 72,
+          "y": 55,
+          "role": "centre back"
+        },
+        {
+          "id": 16,
+          "team": "away",
+          "x": 77,
+          "y": 80,
+          "role": "left back"
+        },
+        {
+          "id": 17,
+          "team": "away",
+          "x": 60,
+          "y": 18,
+          "role": "right midfielder"
+        },
+        {
+          "id": 18,
+          "team": "away",
+          "x": 56,
+          "y": 46,
+          "role": "central midfielder"
+        },
+        {
+          "id": 19,
+          "team": "away",
+          "x": 57,
+          "y": 58,
+          "role": "central midfielder"
+        },
+        {
+          "id": 20,
+          "team": "away",
+          "x": 61,
+          "y": 80,
+          "role": "left midfielder"
+        },
+        {
+          "id": 21,
+          "team": "away",
+          "x": 41,
+          "y": 49,
+          "role": "striker"
+        },
+        {
+          "id": 22,
+          "team": "away",
+          "x": 45,
+          "y": 43,
+          "role": "striker"
+        }
+      ]
+    },
+    {
+      "time": 4.8,
+      "ball": {
+        "x": 55.9,
+        "y": 62,
+        "owner": 8
+      },
+      "players": [
+        {
+          "id": 1,
+          "team": "home",
+          "x": 6,
+          "y": 50,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 2,
+          "team": "home",
+          "x": 42,
+          "y": 85,
+          "role": "right back"
+        },
+        {
+          "id": 5,
+          "team": "home",
+          "x": 22,
+          "y": 62,
+          "role": "centre back"
+        },
+        {
+          "id": 4,
+          "team": "home",
+          "x": 24,
+          "y": 36,
+          "role": "centre back"
+        },
+        {
+          "id": 3,
+          "team": "home",
+          "x": 30,
+          "y": 18,
+          "role": "left back"
+        },
+        {
+          "id": 6,
+          "team": "home",
+          "x": 43,
+          "y": 52,
+          "role": "defensive midfielder"
+        },
+        {
+          "id": 8,
+          "team": "home",
+          "x": 55,
+          "y": 62,
+          "role": "central midfielder"
+        },
+        {
+          "id": 10,
+          "team": "home",
+          "x": 50,
+          "y": 35,
+          "role": "attacking midfielder"
+        },
+        {
+          "id": 7,
+          "team": "home",
+          "x": 70,
+          "y": 84,
+          "role": "right winger"
+        },
+        {
+          "id": 11,
+          "team": "home",
+          "x": 64,
+          "y": 14,
+          "role": "left winger"
+        },
+        {
+          "id": 9,
+          "team": "home",
+          "x": 70,
+          "y": 50,
+          "role": "striker"
+        },
+        {
+          "id": 12,
+          "team": "away",
+          "x": 95,
+          "y": 50,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 13,
+          "team": "away",
+          "x": 77,
+          "y": 20,
+          "role": "right back"
+        },
+        {
+          "id": 14,
+          "team": "away",
+          "x": 72,
+          "y": 46,
+          "role": "centre back"
+        },
+        {
+          "id": 15,
+          "team": "away",
+          "x": 72,
+          "y": 55,
+          "role": "centre back"
+        },
+        {
+          "id": 16,
+          "team": "away",
+          "x": 78,
+          "y": 78,
+          "role": "left back"
+        },
+        {
+          "id": 17,
+          "team": "away",
+          "x": 60,
+          "y": 18,
+          "role": "right midfielder"
+        },
+        {
+          "id": 18,
+          "team": "away",
+          "x": 56,
+          "y": 46,
+          "role": "central midfielder"
+        },
+        {
+          "id": 19,
+          "team": "away",
+          "x": 58,
+          "y": 60,
+          "role": "central midfielder"
+        },
+        {
+          "id": 20,
+          "team": "away",
+          "x": 60,
+          "y": 75,
+          "role": "left midfielder"
+        },
+        {
+          "id": 21,
+          "team": "away",
+          "x": 41,
+          "y": 49,
+          "role": "striker"
+        },
+        {
+          "id": 22,
+          "team": "away",
+          "x": 45,
+          "y": 43,
+          "role": "striker"
+        }
+      ]
+    },
+    {
+      "time": 5.8,
+      "ball": {
+        "x": 64,
+        "y": 74,
+        "owner": null
+      },
+      "players": [
+        {
+          "id": 1,
+          "team": "home",
+          "x": 6,
+          "y": 50,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 2,
+          "team": "home",
+          "x": 48,
+          "y": 86,
+          "role": "right back"
+        },
+        {
+          "id": 5,
+          "team": "home",
+          "x": 22,
+          "y": 62,
+          "role": "centre back"
+        },
+        {
+          "id": 4,
+          "team": "home",
+          "x": 24,
+          "y": 36,
+          "role": "centre back"
+        },
+        {
+          "id": 3,
+          "team": "home",
+          "x": 30,
+          "y": 18,
+          "role": "left back"
+        },
+        {
+          "id": 6,
+          "team": "home",
+          "x": 43,
+          "y": 52,
+          "role": "defensive midfielder"
+        },
+        {
+          "id": 8,
+          "team": "home",
+          "x": 55,
+          "y": 62,
+          "role": "central midfielder"
+        },
+        {
+          "id": 10,
+          "team": "home",
+          "x": 50,
+          "y": 35,
+          "role": "attacking midfielder"
+        },
+        {
+          "id": 7,
+          "team": "home",
+          "x": 72,
+          "y": 85,
+          "role": "right winger"
+        },
+        {
+          "id": 11,
+          "team": "home",
+          "x": 64,
+          "y": 14,
+          "role": "left winger"
+        },
+        {
+          "id": 9,
+          "team": "home",
+          "x": 70,
+          "y": 50,
+          "role": "striker"
+        },
+        {
+          "id": 12,
+          "team": "away",
+          "x": 95,
+          "y": 50,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 13,
+          "team": "away",
+          "x": 77,
+          "y": 20,
+          "role": "right back"
+        },
+        {
+          "id": 14,
+          "team": "away",
+          "x": 72,
+          "y": 46,
+          "role": "centre back"
+        },
+        {
+          "id": 15,
+          "team": "away",
+          "x": 72,
+          "y": 55,
+          "role": "centre back"
+        },
+        {
+          "id": 16,
+          "team": "away",
+          "x": 78,
+          "y": 81,
+          "role": "left back"
+        },
+        {
+          "id": 17,
+          "team": "away",
+          "x": 60,
+          "y": 18,
+          "role": "right midfielder"
+        },
+        {
+          "id": 18,
+          "team": "away",
+          "x": 56,
+          "y": 46,
+          "role": "central midfielder"
+        },
+        {
+          "id": 19,
+          "team": "away",
+          "x": 58,
+          "y": 60,
+          "role": "central midfielder"
+        },
+        {
+          "id": 20,
+          "team": "away",
+          "x": 59,
+          "y": 71,
+          "role": "left midfielder"
+        },
+        {
+          "id": 21,
+          "team": "away",
+          "x": 41,
+          "y": 49,
+          "role": "striker"
+        },
+        {
+          "id": 22,
+          "team": "away",
+          "x": 45,
+          "y": 43,
+          "role": "striker"
+        }
+      ]
+    },
+    {
+      "time": 6.8,
+      "ball": {
+        "x": 74.9,
+        "y": 86,
+        "owner": 7
+      },
+      "players": [
+        {
+          "id": 1,
+          "team": "home",
+          "x": 6,
+          "y": 50,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 2,
+          "team": "home",
+          "x": 48,
+          "y": 86,
+          "role": "right back"
+        },
+        {
+          "id": 5,
+          "team": "home",
+          "x": 22,
+          "y": 62,
+          "role": "centre back"
+        },
+        {
+          "id": 4,
+          "team": "home",
+          "x": 24,
+          "y": 36,
+          "role": "centre back"
+        },
+        {
+          "id": 3,
+          "team": "home",
+          "x": 30,
+          "y": 18,
+          "role": "left back"
+        },
+        {
+          "id": 6,
+          "team": "home",
+          "x": 43,
+          "y": 52,
+          "role": "defensive midfielder"
+        },
+        {
+          "id": 8,
+          "team": "home",
+          "x": 60,
+          "y": 62,
+          "role": "central midfielder"
+        },
+        {
+          "id": 10,
+          "team": "home",
+          "x": 50,
+          "y": 35,
+          "role": "attacking midfielder"
+        },
+        {
+          "id": 7,
+          "team": "home",
+          "x": 74,
+          "y": 86,
+          "role": "right winger"
+        },
+        {
+          "id": 11,
+          "team": "home",
+          "x": 64,
+          "y": 14,
+          "role": "left winger"
+        },
+        {
+          "id": 9,
+          "team": "home",
+          "x": 76,
+          "y": 52,
+          "role": "striker"
+        },
+        {
+          "id": 12,
+          "team": "away",
+          "x": 95,
+          "y": 50,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 13,
+          "team": "away",
+          "x": 77,
+          "y": 20,
+          "role": "right back"
+        },
+        {
+          "id": 14,
+          "team": "away",
+          "x": 72,
+          "y": 46,
+          "role": "centre back"
+        },
+        {
+          "id": 15,
+          "team": "away",
+          "x": 72,
+          "y": 55,
+          "role": "centre back"
+        },
+        {
+          "id": 16,
+          "team": "away",
+          "x": 78,
+          "y": 83,
+          "role": "left back"
+        },
+        {
+          "id": 17,
+          "team": "away",
+          "x": 60,
+          "y": 18,
+          "role": "right midfielder"
+        },
+        {
+          "id": 18,
+          "team": "away",
+          "x": 56,
+          "y": 46,
+          "role": "central midfielder"
+        },
+        {
+          "id": 19,
+          "team": "away",
+          "x": 58,
+          "y": 60,
+          "role": "central midfielder"
+        },
+        {
+          "id": 20,
+          "team": "away",
+          "x": 59,
+          "y": 71,
+          "role": "left midfielder"
+        },
+        {
+          "id": 21,
+          "team": "away",
+          "x": 41,
+          "y": 49,
+          "role": "striker"
+        },
+        {
+          "id": 22,
+          "team": "away",
+          "x": 45,
+          "y": 43,
+          "role": "striker"
+        }
+      ]
+    }
+  ]
+}

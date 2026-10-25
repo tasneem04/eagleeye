@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EagleEye</title>
+  <meta name="description" content="EagleEye: an AI vision coach for footballers, built on synthetic data with fictional Blue and Red teams.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+        <circle cx="12" cy="12" r="4" fill="currentColor"/>
+      </svg>
+      <div>
+        <div class="brand-name">EagleEye</div>
+        <div class="brand-tagline">See the pitch before the ball arrives</div>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Mode">
+      <button id="tab-analyse" class="tab on" role="tab" aria-selected="true">Analyse</button>
+      <button id="tab-train" class="tab" role="tab" aria-selected="false">Train</button>
+    </nav>
+    <div class="topbar-right">
+      <label class="select-field analyse-only">
+        <span>Scenario</span>
+        <select id="scenario-select"></select>
+      </label>
+      <label class="select-field analyse-only">
+        <span>Match situation</span>
+        <select id="situation-select"></select>
+      </label>
+      <span id="knowledge-badge" class="badge knowledge" title="Coaching knowledge used by the agents (File Search). It changes only through KnowledgeScout research the coach approved."></span>
+      <button id="scout-toggle" class="badge scout" type="button" aria-expanded="false" aria-controls="scout-panel" title="KnowledgeScout: background web research that grows the football reference. Proposals wait for your approval.">Scout</button>
+      <span id="mode-badge" class="badge">Connecting…</span>
+    </div>
+  </header>
+  <aside id="scout-panel" class="scout-panel" hidden aria-label="KnowledgeScout proposals"></aside>
+
+  <main class="layout">
+    <section class="stage">
+      <p id="scenario-description" class="scenario-description"></p>
+
+      <div class="pitch-wrap" id="pitch-wrap">
+        <canvas id="pitch" aria-label="Bird's-eye view of the pitch"></canvas>
+        <div id="scoreboard" class="scoreboard"></div>
+        <div id="pitch-hint" class="pitch-hint">Press play, then pause and click any player</div>
+        <div id="train-hud" class="train-hud" hidden>
+          <div class="hud-top">
+            <span id="hud-scans" class="hud-pill">Scans 0</span>
+            <div class="hud-bar" aria-label="Time until the ball arrives"><div id="hud-bar-fill"></div></div>
+            <span id="hud-time" class="hud-pill">0.0 s</span>
+          </div>
+          <svg class="hud-compass" viewBox="0 0 80 80" aria-label="Head direction">
+            <circle cx="40" cy="40" r="34" fill="rgba(10,15,26,0.7)" stroke="#475569"/>
+            <circle cx="40" cy="9" r="4" fill="#ffffff"/>
+            <g id="hud-needle">
+              <path d="M40 40 L64 16 A34 34 0 0 0 16 16 Z" fill="rgba(56,189,248,0.22)"/>
+              <line x1="40" y1="40" x2="40" y2="12" stroke="#f5c542" stroke-width="3" stroke-linecap="round"/>
+            </g>
+            <circle cx="40" cy="40" r="4" fill="#f5c542"/>
+          </svg>
+          <button class="hud-look left" data-look="left">◀ Check left</button>
+          <button class="hud-look body" data-body>Open body ↑</button>
+          <button class="hud-look right" data-look="right">Check right ▶</button>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="btn-restart" class="icon-btn" title="Rewind to start" aria-label="Rewind to start">
+          <svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14l-10-7z"/></svg>
+        </button>
+        <button id="btn-back" class="icon-btn" title="Previous moment (←)" aria-label="Previous moment">
+          <svg viewBox="0 0 24 24"><path d="M15 5v14l-9-7z"/></svg>
+        </button>
+        <button id="btn-play" class="icon-btn primary" title="Play / Pause (Space)" aria-label="Play">
+          <svg id="icon-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg>
+          <svg id="icon-pause" viewBox="0 0 24 24" style="display: none"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+        </button>
+        <button id="btn-forward" class="icon-btn" title="Next moment (→)" aria-label="Next moment">
+          <svg viewBox="0 0 24 24"><path d="M9 5v14l9-7z"/></svg>
+        </button>
+        <div class="timeline">
+          <input id="timeline" type="range" min="0" max="1" step="0.01" value="0" aria-label="Timeline">
+          <div id="timeline-marks" class="timeline-marks"></div>
+        </div>
+        <span id="time-label" class="time-label">0.0 s</span>
+        <label class="toggle" title="Simplified pitch control × threat: gold = valuable space the selected team can win">
+          <input id="heatmap-toggle" type="checkbox"> Space value
+        </label>
+        <button id="pov-toggle" class="pill-btn" type="button" aria-pressed="false" aria-controls="pov-card" title="Player's view: see the moment through the selected player's eyes (V)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C6.5 5 2.7 9.2 1.5 12c1.2 2.8 5 7 10.5 7s9.3-4.2 10.5-7C21.3 9.2 17.5 5 12 5zm0 11.5A4.5 4.5 0 1 1 12 7.5a4.5 4.5 0 0 1 0 9zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg>
+          Player's view
+        </button>
+        <select id="speed-select" class="speed" aria-label="Playback speed">
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+        </select>
+      </div>
+
+      <p class="key-hints analyse-only" aria-label="Keyboard shortcuts">
+        <span><kbd>Space</kbd> play / pause</span>
+        <span><kbd>←</kbd> <kbd>→</kbd> previous / next moment</span>
+        <span><kbd>V</kbd> player's view</span>
+        <span>click the player's view, then <kbd>←</kbd> <kbd>→</kbd> or drag to look around, <kbd>0</kbd> to face the ball</span>
+      </p>
+
+      <ul class="legend">
+        <li><span class="swatch team-home"></span>Blue</li>
+        <li><span class="swatch team-away"></span>Red</li>
+        <li><span class="line open"></span>Open pass</li>
+        <li><span class="line blocked"></span>Lane blocked</li>
+        <li><span class="line marked"></span>Receiver marked</li>
+        <li><span class="swatch triangle"></span>Triangle</li>
+        <li><span class="line third-man"></span>Third-man route</li>
+        <li><span class="line decision"></span>Decision</li>
+        <li><span class="swatch move"></span>Move here (off the ball)</li>
+        <li><span class="swatch space"></span>Free space</li>
+      </ul>
+    </section>
+
+    <div class="side">
+      <section id="pov-card" class="card pov-card analyse-only" hidden aria-label="Player's view">
+        <div class="pov-head">
+          <h3 id="pov-title">Player's view</h3>
+          <span id="pov-yaw" class="pov-yaw">Facing the ball</span>
+        </div>
+        <div class="pov-wrap">
+          <canvas id="pov-canvas" tabindex="0" aria-label="First-person view of the selected player. Use the left and right arrow keys or drag to look around; 0 faces the ball."></canvas>
+          <div id="pov-empty" class="pov-empty">Click a player on the pitch to see through their eyes</div>
+        </div>
+        <ul class="pov-legend">
+          <li><span class="ring open"></span>Open teammate</li>
+          <li><span class="ring target"></span>Decision target</li>
+          <li><span class="ring move"></span>Move here</li>
+        </ul>
+        <p class="sub pov-note">Numbers are only readable in the centre of vision, as in Train. Follows the timeline: press play to watch the run from their eyes.</p>
+      </section>
+      <aside class="panel" id="panel" aria-live="polite"></aside>
+    </div>
+  </main>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

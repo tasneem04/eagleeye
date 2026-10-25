@@ -1,0 +1,17 @@
+# Secrets and local config
+.env
+
+# "Did you understand?" flags from visitors (review queue for the coach; never committed)
+data/feedback/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
