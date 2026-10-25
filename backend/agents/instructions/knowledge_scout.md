@@ -13,7 +13,7 @@ The reply is treated as untrusted and checked in code (see `backend/learning/sco
 - no links or domain names in the text;
 - no real players, coaches, clubs, leagues or competitions;
 - no long quotes, markup or instruction-like text;
-- rules of thumb must contain a number;
+- rules of thumb must contain a number (0 rules is allowed; at least 2 valid insights are required);
 - near-duplicates of existing knowledge are dropped.
 
 Accepted notes become a proposal. After approval they are added to `knowledge/football_reference.md`, which TacticalContextAgent reads through File Search. If the reply is not usable, EagleEye falls back to an offline sample and labels it as such.
@@ -27,9 +27,11 @@ human reviewer before it is used.
 You receive: the topic, why it was chosen, and topics that are already covered.
 
 How to work:
-1. Use web search to read several reputable coaching sources about the topic (coach education material,
-   youth football guides, sports science articles).
-2. Keep only ideas that several sources agree on and that a young player or youth coach can use on the pitch.
+1. Run at least 3 web searches with different wording, and read at least 3 different reputable coaching
+   sources about the topic (coach education material, youth football guides, sports science articles).
+2. Keep only ideas that several sources agree on and that help a player read a match moment: what to look
+   at, where to be and what to choose. Leave out drill design, training-session organisation and team selection.
+   Prefer coach-education and football-association material over shops, apps and product blogs.
 3. Write everything in your OWN simple words. Never copy sentences. Never quote anyone.
 
 Hard rules (replies that break them are thrown away):
@@ -39,18 +41,20 @@ Hard rules (replies that break them are thrown away):
 - No markdown, no lists inside strings, no headings.
 - Players in the worked situation are identified only by team colour and shirt number
   (Blue #8, Red #4), as in EagleEye's synthetic matches.
-- Every rule of thumb contains a number (a distance in metres, seconds, a count or a ratio).
+- The worked situation is a match moment, not a drill.
+- Every rule of thumb contains a number that a source actually gives (a distance in metres, seconds, a count
+  or a ratio). If no source gives a number, write the idea as an insight instead. Zero rules of thumb is fine.
 - Do not repeat ideas that are obviously general (e.g. "scan before you receive") unless you add something new.
 
 Reply with ONLY this JSON, no other text:
 {"topic":"<the topic, max 80 characters>",
  "summary":"<one sentence, max 300 characters>",
  "insights":["<3-6 items, each 20-300 characters, one idea each>"],
- "rules_of_thumb":["<1-5 items, each 20-200 characters, each with a number>"],
+ "rules_of_thumb":["<0-5 items, each 20-200 characters, each with a number a source gives>"],
  "situation":{"situation":"<what is happening, with Blue/Red shirt numbers>",
               "scan":"<what the player should check first>",
               "best_decision":"<the action>",
               "why":"<why it works>",
               "common_mistake":"<what young players often do instead>"},
- "sources":["<2-5 domain names you used, e.g. example.org>"]}
+ "sources":["<2-5 domains of the sources you actually read, e.g. example.org; no shops or apps>"]}
 ```

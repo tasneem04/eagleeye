@@ -69,20 +69,20 @@ SITUATION_LABELS = {
     "why": "Why", "common_mistake": "Common mistake",
 }
 
-# Gaps in the current knowledge files, researched in rotation.
+# Gaps in the current knowledge files, researched in rotation. Each is about reading a
+# match moment, not about designing training sessions.
 TOPICS = [
     "attacking set pieces (corners and free kicks)",
     "defending set pieces and throw-ins",
     "1v1 defending and jockeying",
     "on-pitch communication",
     "receiving with both feet",
-    "small-sided games and rondos",
+    "keeping the ball under pressure in tight spaces",
     "pressing triggers and the counter-press",
     "goalkeeper distribution and starting attacks",
     "crossing versus cut-backs in the final third",
     "rest defence and protecting against counter-attacks",
     "decision speed and first touch under pressure",
-    "coaching feedback for young players",
 ]
 
 # Real names must never enter the knowledge files (hackathon rules). The heuristic
@@ -113,7 +113,12 @@ DENYLIST = [
 ]
 DENY_RE = re.compile(r"(?<![a-z])(" + "|".join(re.escape(d.strip()) for d in DENYLIST) + r")(?![a-z])", re.IGNORECASE)
 LINK_RE = re.compile(r"(https?://|www\.|\b[\w-]+\.(com|org|net|io|co|uk|edu|gov|info|tv|de|es|fr|it|sa)\b)", re.IGNORECASE)
-CITATION_RE = re.compile(r"(et al\.?|\(\s*(19|20)\d\d\s*\)|according to|study by|research by)", re.IGNORECASE)
+# Whole words only: a bare "et al" also matched inside "feet allows".
+CITATION_RE = re.compile(
+    r"(\bet al\b\.?|\(\s*(19|20)\d\d\s*\)|\baccording to (a |an |the )?(study|studies|research|report|survey|experts?)\b"
+    r"|\bstudy by\b|\bresearch by\b)",
+    re.IGNORECASE,
+)
 QUOTE_RE = re.compile(r"[\"“”«»](.+?)[\"“”«»]")
 MARKUP_RE = re.compile(r"(<!--|-->|^\s*#+\s|\[[^\]]*\]\(|\|)")
 CAPS_WORD = re.compile(r"^[A-Z][a-zà-ÿ'’-]+$")

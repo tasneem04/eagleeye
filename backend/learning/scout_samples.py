@@ -111,22 +111,21 @@ SAMPLES = {
         },
         "sources": [],
     },
-    "small-sided games and rondos": {
-        "summary": "Small-sided games and rondos give young players many more touches and decisions than a full-size match.",
+    "keeping the ball under pressure in tight spaces": {
+        "summary": "In a crowded part of the pitch, the player who knows where the pressure comes from before the ball arrives can play away from it.",
         "insights": [
-            "Fewer players per side means each player touches the ball far more often and has to scan and decide more often.",
-            "A rondo (keep-away in a circle) trains the half-turn, the first touch and the passing angle all at once.",
-            "Changing the pitch size changes the problem: a small area trains quick decisions, a bigger area trains passing range and running.",
-            "Adding a rule such as 'two touches maximum' forces players to scan before the ball arrives.",
+            "Find out which side the nearest opponent is coming from before the ball arrives, so the first touch or pass can go the other way.",
+            "Opening the body with a half-turn lets the player see the pressure and the free teammate at the same time.",
+            "A first-time pass is often the safest way out when two opponents close in, because they have no time to arrive.",
+            "Passing back to the teammate who gave the ball is a good choice in a tight space: it keeps the ball and pulls the opponents forward.",
         ],
         "rules_of_thumb": [
-            "A 4v4 game gives each player several times more touches than an 11v11 match of the same length.",
-            "Keep each rondo round short, around 1 to 2 minutes, so intensity and focus stay high.",
+            "If an opponent will be within about 2 metres as the ball arrives, play the ball away from that side with the first touch.",
         ],
         "situation": {
-            "situation": "In a 5v2 rondo, Blue #3 receives the ball while both Red players press from his left.",
-            "scan": "Before the pass arrives, which teammate is on the opposite side to the pressure?",
-            "best_decision": "#3 opens his body and passes first time to the teammate on his right, away from both Red players.",
+            "situation": "In midfield, Blue #3 is about to receive from Blue #4 while Red #7 and Red #9 close in from his left.",
+            "scan": "Before the pass arrives, which teammate is on the side away from Red #7 and Red #9?",
+            "best_decision": "#3 opens his body and passes first time to the free teammate on his right, away from both Red players.",
             "why": "Playing away from the pressure keeps the ball and makes the Red players run again.",
             "common_mistake": "Taking a touch towards the pressure, which lets the two Red players trap him.",
         },

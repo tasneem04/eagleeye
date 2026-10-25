@@ -303,3 +303,22 @@ def test_scout_api_review_flow(tmp_path, monkeypatch):
         assert client.post(f"/api/scout/reject/{second}", json={"note": "later"}).json()["result"]["status"] == "rejected"
         assert client.post("/api/knowledge/sync").json()["synced"] is False
     assert "Researched notes" in (kdir / "football_reference.md").read_text(encoding="utf-8")
+
+
+def test_citation_check_matches_whole_words_only():
+    assert sc.check_text("Weight on the balls of the feet allows quick changes of direction.", sc.INSIGHT_CHARS) is None
+    assert sc.check_text("Adjust the distance according to the speed of the attacker in front.", sc.INSIGHT_CHARS) is None
+    assert "citation" in sc.check_text("Defenders win more duels, as shown by Smith et al. in a 2019 paper.", sc.INSIGHT_CHARS)
+    assert "citation" in sc.check_text("According to a study, defenders who wait win more duels.", sc.INSIGHT_CHARS)
+
+
+def test_zero_rules_of_thumb_is_allowed():
+    entry, _ = sc.validate({**GOOD, "rules_of_thumb": []}, [])
+    assert entry is not None and entry["rules_of_thumb"] == [] and len(entry["insights"]) == 3
+
+
+def test_every_offline_sample_is_a_topic_in_the_rotation():
+    from backend.learning.scout_samples import SAMPLES
+    assert set(SAMPLES) <= set(sc.TOPICS)
+    for topic in SAMPLES:
+        assert sc.offline_sample(topic)["topic"] == topic
