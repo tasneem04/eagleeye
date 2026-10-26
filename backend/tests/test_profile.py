@@ -78,3 +78,16 @@ def test_next_endpoint_keeps_nothing_and_answers(make_client):
         assert r.status_code == 200 and r.json()["next_trial_id"]
         too_long = {"level": "rookie", "history": [item() | {"level": "rookie"}] * 31}
         assert client.post("/api/training/next", json=too_long).status_code == 422
+
+
+def test_demo_player_is_graded_by_real_code_and_shows_a_focus(make_client):
+    client, _ = make_client()
+    with client:
+        demo = client.get("/api/training/demo-history").json()
+        trials = client.get("/api/training/trials").json()
+        rec = client.post("/api/training/next", json={"level": "rookie", "history": demo["history"]}).json()
+    assert "sample" in demo["label"].lower()
+    assert len(demo["history"]) >= trials["min_evidence"] == training.MIN_EVIDENCE
+    assert rec["focus"]["key"] == "blind_side_right"
+    meta = {m["id"]: m for m in client.app.state.trial_meta}
+    assert meta[rec["next_trial_id"]]["target_side"] == "right"

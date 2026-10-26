@@ -51,6 +51,7 @@ export const getKnowledge = () => request('/api/knowledge');
 export const getTrials = () => request('/api/training/trials');
 export const evaluateTraining = (body) => post('/api/training/evaluate', body);
 export const nextDrill = (body) => post('/api/training/next', body);
+export const getDemoHistory = () => request('/api/training/demo-history');
 
 // "Did you understand?" flags: a review queue for the admin; they never change any knowledge.
 export const sendClarity = (body) => post('/api/clarity', body);

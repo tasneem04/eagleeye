@@ -8,8 +8,9 @@ import { clarityCard } from './panel.js';
 import { COLORS, PitchView } from './pitch.js';
 import { Playback } from './playback.js';
 import { PovView } from './pov.js';
+import * as profiles from './profiles.js';
 
-const SCAN_ON = 45;       // face turned this far from the ball = one scan
+const SCAN_ON = 45;      // face turned this far from the ball = one scan
 const SCAN_RESET = 20;    // must come back this close before the next scan counts
 const SAMPLE_EVERY = 0.08;
 const OPEN_DEG = 45;      // half-turn: body opened this far from the ball, which stays in view
@@ -17,9 +18,7 @@ const OPEN_TIME_S = 0.3;
 const TIER_RANK = { shape: 1, colour: 2, id: 3 };
 const CARRY_M = 8;        // dribbling toward a teammate: carry this far, then the pass is on
 const MAX_CARRY_M = 15;
-// The player's drill history lives only in this browser; the server keeps nothing about players.
-const HISTORY_KEY = 'eagleeye.training.v2';
-const HISTORY_SIZE = 30;
+// Each player's drill history lives only in this browser (profiles.js); the server keeps nothing about players.
 const LEVEL_NAMES = { rookie: 'Rookie', academy: 'Academy', pro: 'Pro' };
 const VERDICT = {
   best: ['Best choice', 'open'],
@@ -90,9 +89,31 @@ export class Training {
       this.vision = data.vision;
       this.pov.zones = data.vision;
       this.halfAngle = data.vision.identify_deg;
+      this.minEvidence = data.min_evidence ?? 3;
       this.trials = data.trials;
+      try {
+        profiles.setDemoHistory((await api.getDemoHistory()).history);
+      } catch { /* the demo player just starts empty */ }
       await this.#recommend();
     }
+    if (!profiles.currentProfile()) {
+      this.#showWho();
+      return;
+    }
+    await this.#brief(this.trial ?? this.#randomDrill());
+  }
+
+  /** "Who's playing?": pick or create a player before training. */
+  #showWho(error = '') {
+    this.phase = 'who';
+    this.whoError = error;
+    this.newColour ??= profiles.COLOURS[0];
+    this.hud.hidden = true;
+    this.#render();
+  }
+
+  async #playAs() {
+    await this.#recommend();
     await this.#brief(this.trial ?? this.#randomDrill());
   }
 
@@ -192,7 +213,7 @@ export class Training {
 
   /** Weak spots and the next drill, worked out from this player's own recent drills. */
   async #recommend() {
-    const history = loadHistory();
+    const history = profiles.loadHistory();
     if (!history.length) {
       this.recommendation = null;
       return;
@@ -441,6 +462,7 @@ export class Training {
 
   #render() {
     const html = {
+      who: () => this.#whoHtml(),
       brief: () => this.#briefHtml(),
       scanning: () => this.#scanningHtml(),
       deciding: () => this.#decidingHtml(),
@@ -462,6 +484,46 @@ export class Training {
     return { me, teamName };
   }
 
+  #whoHtml() {
+    const { list } = profiles.loadProfiles();
+    const button = (p, extra = '') => `
+      <button class="who-btn" data-train="pick" data-id="${esc(p.id)}">
+        <span class="badge-dot" style="background:${safeColour(p.colour)}"></span><span>${esc(p.name)}${extra}</span>
+      </button>`;
+    return `
+      <div class="card who">
+        <h2>Who's playing?</h2>
+        <div class="sub">EagleEye remembers each player's drills, so it can learn how they scan. Everything stays on this device.</div>
+        <div class="who-list">
+          ${list.map((p) => button(p)).join('')}
+          ${button(profiles.demoProfile(), ' <span class="sub">· sample history, to see the coaching straight away</span>')}
+        </div>
+        <h3 class="who-new-title">New player</h3>
+        <input id="new-name" class="text-input" maxlength="${profiles.MAX_NAME}" placeholder="Nickname (not your real name)" value="${esc(this.newName ?? '')}">
+        <div class="colours" role="radiogroup" aria-label="Badge colour">
+          ${profiles.COLOURS.map((c) => `<button type="button" role="radio" aria-checked="${c === this.newColour}" class="colour${c === this.newColour ? ' on' : ''}" data-train="colour" data-colour="${c}" style="background:${c}" aria-label="Colour"></button>`).join('')}
+        </div>
+        <button class="primary-btn" data-train="create">Start as a new player</button>
+        <details class="code-import">
+          <summary>Have a player code from another device?</summary>
+          <textarea id="code-input" class="text-input" rows="3" placeholder="Paste the code that starts with EE1-"></textarea>
+          <button class="choice-btn" data-train="import">Use this player code</button>
+        </details>
+        ${this.whoError ? `<div class="warning">${esc(this.whoError)}</div>` : ''}
+      </div>`;
+  }
+
+  #playerBar() {
+    const p = profiles.currentProfile();
+    if (!p) return '';
+    return `
+      <div class="card player-bar">
+        <span class="badge-dot" style="background:${safeColour(p.colour)}"></span>
+        <span><strong>${esc(p.name)}</strong>${p.demo ? ' <span class="sub">· sample history</span>' : ''}</span>
+        <button class="link-btn" data-train="switch">Switch player</button>
+      </div>`;
+  }
+
   #briefHtml() {
     const { me, teamName } = this.#who();
     const choices = this.trials.filter((t) => t.kind !== 'drill' || t.level === this.level);
@@ -470,9 +532,11 @@ export class Training {
       ...choices.map((t) => `<option value="${t.id}" ${t.id === this.trial.id ? 'selected' : ''}>${esc(t.kind === 'drill' ? t.title : `Match: ${t.title}, #${t.passer} → #${t.receiver}`)}</option>`),
     ].join('');
     return `
+      ${this.#playerBar()}
+      ${this.#focusHtml(true)}
       <div class="card">
         <h2>Player's Eye training</h2>
-        <div class="sub">See it like a player, then check it with the eagle eye.</div>
+        <div class="sub">See it like a player, then check it with the eagle eye. Train ${this.minEvidence} drills and EagleEye learns how you scan.</div>
         <p class="brief">You are <strong>${esc(teamName)} #${me.id}</strong> (${esc(me.role)}). <strong>#${this.trial.passer}</strong> is about to pass to you.
         Scan before the ball arrives, then choose what to do.</p>
         <div class="seg" role="radiogroup" aria-label="Level">
@@ -499,12 +563,26 @@ export class Training {
         and elite youth scan more often than grassroots players (Aksum et al., 2021).
         <br>This drill practises the habit. It doesn't replace training on the pitch.
       </div>
-      ${this.#focusHtml(false)}
       ${this.#progressHtml()}`;
   }
 
-  /** "Your focus": the main weak spot from the player's own drills, and the drill that trains it. */
+  /**
+   * How EagleEye learns the player: a "drill 1 · 2 · 3" tracker until there is enough evidence,
+   * then "Your focus": the main weak spot from their own drills, and the drill that trains it.
+   */
   #focusHtml(withButton) {
+    const done = profiles.loadHistory().length;
+    const need = this.minEvidence;
+    if (done < need) {
+      const steps = Array.from({ length: need }, (_, i) => `<span class="step-dot${i < done ? ' done' : ''}">${i < done ? '✓' : i + 1}</span>`).join('');
+      return `
+        <div class="card focus-card tracker">
+          <div class="answer-label">EagleEye is getting to know you</div>
+          <div class="step-dots">${steps}</div>
+          <p class="sub">After ${need} drills EagleEye finds your weak spot (for example a blind shoulder) and picks the next drill to train it.
+          ${need - done === 1 ? 'One more to go!' : `${need - done} to go.`}</p>
+        </div>`;
+    }
     const rec = this.recommendation;
     if (!rec) return '';
     const others = rec.weak_spots.slice(1).map((s) => `<li>${esc(s.label)}: ${esc(s.detail)}</li>`).join('');
@@ -517,9 +595,10 @@ export class Training {
       : '';
     const head = rec.focus
       ? `<p><span class="focus-label">Your focus: ${esc(rec.focus.label)}</span><br><span class="sub">${esc(rec.focus.detail)}</span></p>`
-      : '<p class="sub">No weak spot yet: keep going, it builds up after a few drills.</p>';
+      : '<p class="sub">No weak spot right now: your scanning is solid. Keep going.</p>';
     return `
       <div class="card focus-card">
+        <div class="answer-label">EagleEye knows how you scan · from your last ${Math.min(done, 30)} drills</div>
         ${head}
         ${others ? `<ul>${others}</ul>` : ''}
         ${suggest}
@@ -629,18 +708,27 @@ export class Training {
   }
 
   #progressHtml() {
-    const h = loadHistory();
+    const h = profiles.loadHistory();
     if (!h.length) return '';
-    const last = h.slice(-6);
+    const p = profiles.currentProfile();
+    const last = h.slice(-8);
     const avgScans = (last.reduce((s, r) => s + r.scans, 0) / last.length).toFixed(1);
+    const code = p && !p.demo ? `<button class="choice-btn" data-train="copy-code">Copy my player code</button>` : '';
     return `
       <div class="card">
-        <h3>Your progress</h3>
+        <h3>Your progress${p?.demo ? ' <span class="sub">(sample history)</span>' : ''}</h3>
+        ${sparkline(last.map((r) => r.score))}
         <ul class="facts">
           <li><span class="k">Last scores</span><span>${last.map((r) => r.score).join(' → ')}</span></li>
-          <li><span class="k">Scans per drill</span><span>${last.map((r) => r.scans).join(' → ')} (avg ${avgScans})</span></li>
+          <li><span class="k">Scans per drill</span><span>${last.map((r) => `${r.scans}/${r.target_scans}`).join(' → ')} (avg ${avgScans})</span></li>
         </ul>
-        <div class="sub">Kept only in this browser. <button class="choice-btn" data-train="reset-progress">Reset my progress</button></div>
+        ${this.codeShown ? `<textarea class="text-input code-out" rows="3" readonly>${esc(this.codeShown)}</textarea>
+          <div class="sub">Paste this code on another device under "Who's playing?". It holds only your nickname and drill results.</div>` : ''}
+        <div class="sub progress-actions">Kept only on this device.
+          ${code}
+          <button class="choice-btn" data-train="reset-progress">${p?.demo ? 'Reset the sample' : 'Reset my progress'}</button>
+          ${p && !p.demo ? '<button class="link-btn" data-train="delete-player">Delete this player</button>' : ''}
+        </div>
       </div>`;
   }
 
@@ -667,12 +755,11 @@ export class Training {
       this.#brief(this.#randomDrill());
       return;
     }
+    if (this.#onProfileAction(action, btn)) return;
     if (action === 'reset-progress') {
-      try {
-        localStorage.removeItem(HISTORY_KEY);
-      } catch { /* storage blocked: nothing was kept anyway */ }
-      this.recommendation = null;
-      this.#render();
+      profiles.resetHistory();
+      this.codeShown = '';
+      this.#recommend().then(() => this.#render());
       return;
     }
     if (action === 'level') {
@@ -693,6 +780,51 @@ export class Training {
     } else if (action === 'retry') {
       this.#brief(this.trial);
     }
+  }
+
+  /** Who's playing: pick, create, import, switch, copy the code, delete. Returns true if handled. */
+  #onProfileAction(action, btn) {
+    const nameInput = () => this.panel.querySelector('#new-name');
+    if (action === 'pick') {
+      profiles.selectProfile(btn.dataset.id);
+      this.codeShown = '';
+      this.#playAs();
+    } else if (action === 'switch') {
+      this.#showWho();
+    } else if (action === 'colour') {
+      this.newName = nameInput()?.value ?? '';
+      this.newColour = btn.dataset.colour;
+      this.#render();
+    } else if (action === 'create') {
+      this.newName = nameInput()?.value ?? '';
+      if (!profiles.createProfile(this.newName, this.newColour)) {
+        this.#showWho('Type a nickname first.');
+        return true;
+      }
+      this.newName = '';
+      this.#playAs();
+    } else if (action === 'import') {
+      try {
+        profiles.importPlayerCode(this.panel.querySelector('#code-input')?.value);
+        this.#playAs();
+      } catch (err) {
+        this.#showWho(err.message);
+      }
+    } else if (action === 'copy-code') {
+      this.codeShown = profiles.playerCode();
+      navigator.clipboard?.writeText(this.codeShown).catch(() => { /* shown on screen to copy by hand */ });
+      this.#render();
+    } else if (action === 'delete-player') {
+      const p = profiles.currentProfile();
+      if (p && window.confirm(`Delete ${p.name} and their drills from this device?`)) {
+        profiles.deleteProfile(p.id);
+        this.recommendation = null;
+        this.#showWho();
+      }
+    } else {
+      return false;
+    }
+    return true;
   }
 
   // ---- data -------------------------------------------------------------------
@@ -718,7 +850,7 @@ export class Training {
 
   /** What the weak-spot finder needs, and nothing that identifies the player. */
   #saveHistory(result) {
-    const h = loadHistory();
+    const h = profiles.loadHistory();
     h.push({
       trial_id: this.trial.id,
       level: this.level,
@@ -732,20 +864,24 @@ export class Training {
       missed: result.missed.slice(0, 12).map((m) => ({ side: m.side, angle: m.angle, open: m.open })),
       at: Date.now(),
     });
-    try {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(-HISTORY_SIZE)));
-    } catch {
-      /* private mode or blocked storage: progress just isn't kept */
-    }
+    profiles.saveHistory(h);
   }
 }
 
-function loadHistory() {
-  try {
-    return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]');
-  } catch {
-    return [];
-  }
+/** A tiny line of recent scores (0-100). */
+function sparkline(scores) {
+  if (scores.length < 2) return '';
+  const w = 220;
+  const h = 40;
+  const step = w / (scores.length - 1);
+  const pts = scores.map((s, i) => `${(i * step).toFixed(1)},${(h - 4 - (s / 100) * (h - 8)).toFixed(1)}`).join(' ');
+  return `<svg class="sparkline" viewBox="0 0 ${w} ${h}" role="img" aria-label="Recent scores: ${scores.join(', ')}">
+    <polyline points="${pts}" fill="none" stroke="#f5c542" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+
+function safeColour(c) {
+  return profiles.COLOURS.includes(c) || c === '#94a3b8' ? c : profiles.COLOURS[0];
 }
 
 function capitalise(s) {

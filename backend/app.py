@@ -71,6 +71,9 @@ async def lifespan(app: FastAPI):
     # Where each trial's free player is (for choosing drills); kept server-side only.
     app.state.trial_meta = [training.trial_meta(app.state.scenarios[t["scenario_id"]], t)
                             for t in app.state.trials.values()]
+    # The labelled demo player, graded through the real code (see training.demo_history).
+    app.state.demo_history = training.demo_history(app.state.scenarios, list(app.state.trials.values()),
+                                                   app.state.trial_meta)
     app.state.limiter = RateLimiter(enabled=os.getenv("RATE_LIMITS", "on").strip().lower() != "off")
     app.state.budget = AgentBudget(int(_float_env("AGENT_CALLS_PER_HOUR", 600)))
     app.state.clarity = ClarityStore(CLARITY_PATH)
@@ -420,8 +423,15 @@ def training_trials(request: Request):
         "vision": {"identify_deg": training.IDENTIFY_DEG, "colour_deg": training.COLOUR_DEG,
                    "presence_deg": training.PRESENCE_DEG},
         "seen_half_angle_deg": training.SEEN_HALF_ANGLE_DEG,
+        "min_evidence": training.MIN_EVIDENCE,  # drills before EagleEye names a weak spot
         "trials": list(request.app.state.trials.values()),
     }
+
+
+@app.get("/api/training/demo-history")
+def training_demo_history(request: Request):
+    """Sample drills for the labelled demo player, so the adaptation shows without playing 3 drills first."""
+    return {"label": "Demo player (sample history)", "history": request.app.state.demo_history}
 
 
 class Choice(BaseModel):

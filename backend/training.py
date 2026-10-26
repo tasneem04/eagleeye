@@ -394,6 +394,40 @@ def weak_spots(history: list[dict]) -> list[dict]:
     return spots
 
 
+def history_item(trial: dict, level: str, result: dict) -> dict:
+    """One graded drill in the shape the browser keeps (see frontend/js/training.js): nothing identifying."""
+    return {
+        "trial_id": trial["id"], "level": level, "score": result["score"], "verdict": result["verdict"],
+        "scans": result["scans"], "target_scans": result["target_scans"],
+        "timed": LEVELS[level]["decision_s"] is not None, "too_slow": bool(result.get("too_slow")),
+        "opened_body": bool(result.get("opened_body")),
+        "missed": [{"side": m["side"], "angle": m["angle"], "open": m["open"]} for m in result["missed"][:12]],
+    }
+
+
+def demo_history(scenarios: dict, trials: list[dict], metas: list[dict], drills: int = 4) -> list[dict]:
+    """The labelled demo player: scans enough, but never checks over the right shoulder.
+
+    Built by grading scripted drills with the real grading code, so the sample is exactly what a
+    player with that habit would produce, and "Your focus" appears without playing 3 drills first.
+    """
+    sides = {m["id"]: m["target_side"] for m in metas}
+    picks = [t for t in trials if t["kind"] == "drill" and sides.get(t["id"]) == "right"]
+    picks.sort(key=lambda t: (LEVEL_ORDER.index(t["level"]), t["id"]))  # easiest first
+    history = []
+    for trial in picks[:drills]:
+        level = trial["level"]
+        answer = answer_key(scenarios[trial["scenario_id"]], trial)
+        seen = [k["id"] for k in answer["key_players"] if k["side"] != "right"]
+        mates = [k["id"] for k in answer["key_players"]
+                 if k["team"] == trial["team"] and k["open"] and k["id"] in seen]
+        choice = {"action": "pass", "target_player_id": mates[0]} if mates else {"action": "dribble"}
+        goal = target_scans(level, trial["window_s"])
+        result = grade(answer, level, goal, seen, choice, window_s=trial["window_s"])
+        history.append(history_item(trial, level, result))
+    return history
+
+
 def level_suggestion(history: list[dict], level: str) -> dict | None:
     last = [h for h in history if h.get("level") == level][-3:]
     if len(last) < 3:

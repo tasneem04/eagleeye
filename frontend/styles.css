@@ -575,4 +575,37 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; border-radius: 5
 }
 .scout-clarity { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 6px; }
 .focus-card .focus-label { color: var(--accent); font-weight: 700; }
+
+/* Who's playing: nickname profiles kept on this device */
+.who-list { display: grid; gap: 8px; margin: 12px 0 4px; }
+.who-btn {
+  display: flex; align-items: center; gap: 10px; text-align: left; padding: 10px 12px;
+  border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+  font-weight: 600; font-size: 15px; cursor: pointer;
+}
+.who-btn:hover { border-color: var(--accent); }
+.who-btn .sub { font-weight: 400; }
+.badge-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+.who-new-title { margin: 16px 0 8px !important; }
+.text-input {
+  width: 100%; box-sizing: border-box; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text); font: inherit; font-size: 14px;
+}
+.colours { display: flex; gap: 10px; margin: 10px 0 12px; }
+.colour { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.colour.on { border-color: #fff; box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px rgba(255, 255, 255, 0.4); }
+.code-import { margin-top: 14px; font-size: 13px; color: var(--muted); }
+.code-import summary { cursor: pointer; }
+.code-import textarea { margin: 8px 0; }
+.player-bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; }
+.player-bar .link-btn { margin-left: auto; }
+.tracker .step-dots { display: flex; gap: 10px; margin: 10px 0 8px; }
+.step-dot {
+  display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%;
+  border: 2px solid var(--border); color: var(--muted); font-weight: 700; font-size: 13px;
+}
+.step-dot.done { border-color: var(--accent); background: var(--accent); color: #111; }
+.sparkline { display: block; width: 100%; max-width: 260px; height: 40px; margin: 8px 0 4px; }
+.progress-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.code-out { margin-top: 8px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
 .focus-card ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); }
