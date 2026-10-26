@@ -345,10 +345,13 @@ details.how > summary:focus-visible { outline: 2px solid var(--accent); outline-
 .verdict-card.tone-good { border-left-color: var(--open); }
 .verdict-card.tone-ok { border-left-color: var(--accent); }
 .verdict-card.tone-risky { border-left-color: var(--blocked); }
-.call-compare { display: flex; gap: 28px; margin-bottom: 8px; }
-.call-compare strong { display: block; font-size: 20px; margin-top: 2px; }
-.call-compare .you { color: #ffffff; }
-.call-compare .agents { color: var(--accent); }
+table.compare { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 10px; table-layout: fixed; }
+table.compare th, table.compare td { text-align: left; padding: 6px 6px; vertical-align: top; border-bottom: 1px solid var(--border); }
+table.compare tbody th { color: var(--muted); font-weight: 600; width: 22%; }
+table.compare thead th { border-bottom: 1px solid var(--border); }
+table.compare strong { display: block; font-size: 18px; margin-top: 2px; }
+table.compare .you { color: #ffffff; }
+table.compare .agents { color: var(--accent); }
 .verdict-text { margin: 0 0 12px; font-size: 15px; line-height: 1.5; }
 
 /* First-visit guide above the pitch */

@@ -238,6 +238,10 @@ el.panel.addEventListener('click', (e) => {
 function onCall(action) {
   const sel = state.selection;
   if (!sel?.call) return;
+  if (action === 'other') {
+    clearSelection();
+    return;
+  }
   if (action === 'skip') sel.call = { asking: false, revealed: true, choice: null };
   else if (action === 'again') sel.call = { asking: true, revealed: true, choice: null };
   else makeChoice({ action });
@@ -350,6 +354,7 @@ function syncControls() {
 
   let hint = '';
   if (state.selection?.call?.asking) hint = 'Your call: click a teammate to pass, or choose Dribble or Shoot';
+  else if (state.selection?.call) hint = 'Click another teammate to try that pass';
   else if (playback.playing) hint = 'Pause, then click a player';
   else if (!state.selection && state.pov.on && state.pov.playerId != null) hint = `Following #${state.pov.playerId}: click a player to see their options`;
   else if (!state.selection) hint = 'Click any player to see what they should see';
@@ -483,8 +488,9 @@ el.canvas.addEventListener('click', (e) => {
   const hit = view.hitTest(e.clientX - rect.left, e.clientY - rect.top, playback.current().players);
   if (!hit) return;
   const sel = state.selection;
-  if (sel?.call?.asking && hit.team === sel.player.team) {
-    // Answering "What would you do?": a teammate is a pass, yourself is no choice.
+  if (sel?.call && hit.team === sel.player.team) {
+    // "Your call" for the ball carrier: any teammate is a pass to try (before or after the first answer),
+    // yourself is no choice. "Look at another player" ends the call to analyse someone else.
     if (hit.id !== sel.player.id) makeChoice({ action: 'pass', target_player_id: hit.id });
     return;
   }

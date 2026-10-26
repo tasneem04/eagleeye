@@ -95,67 +95,132 @@ function askCard(call) {
         <button class="choice-btn" data-call="dribble">Dribble</button>
         <button class="choice-btn" data-call="shoot">Shoot</button>
         ${again ? '' : '<button class="link-btn" data-call="skip">Skip: just show me</button>'}
+        <button class="link-btn" data-call="other">Look at another player</button>
       </div>
       ${again ? '' : '<p class="sub call-note">The agents are working out their answer while you think.</p>'}
     </div>`;
 }
 
-/** The player's choice next to the agents' answer, with a one-line verdict worked out from the geometry. */
+/** Your choice next to the agents' answer: a side-by-side table from the measured geometry, and why. */
 function verdictCard(choice, selection) {
-  const d = selection.analysis?.stages.find((s) => s.key === 'decision')?.data;
-  const v = callVerdict(choice, selection.geometry, d);
+  const stages = selection.analysis?.stages ?? [];
+  const d = stages.find((s) => s.key === 'decision')?.data;
+  const mode = stages.find((s) => s.key === 'tactical_context')?.data?.mode;
+  const g = selection.geometry;
+  const v = callVerdict(choice, g, d, mode);
+  const mine = optionFacts(choice, g);
+  const theirs = d ? optionFacts(d, g) : null;
+  const rows = mine.map(([label, value], i) => `
+    <tr><th>${esc(label)}</th><td>${esc(value)}</td><td>${theirs ? esc(theirs[i][1]) : '…'}</td></tr>`).join('');
   return `
     <div class="card verdict-card tone-${v.tone}">
-      <div class="call-compare">
-        <span><span class="answer-label">You</span><strong class="you">${esc(moveText(choice))}</strong></span>
-        <span><span class="answer-label">Agents</span><strong class="agents">${d ? esc(moveText(d)) : '…'}</strong></span>
+      <table class="compare">
+        <thead><tr><th></th><th><span class="answer-label">You</span><strong class="you">${esc(moveText(choice))}</strong></th>
+          <th><span class="answer-label">Best</span><strong class="agents">${d ? esc(moveText(d)) : '…'}</strong></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p class="verdict-text"><strong>Why:</strong> ${esc(v.text)}</p>
+      <div class="call-buttons">
+        <button class="choice-btn" data-call="again">Try another option</button>
+        <button class="link-btn" data-call="other">Look at another player</button>
       </div>
-      <p class="verdict-text">${esc(v.text)}</p>
-      <button class="choice-btn" data-call="again">Try another option</button>
+      <p class="sub">Tip: click any other teammate on the pitch to try that pass.</p>
     </div>`;
+}
+
+/** The same four facts for any option, so the player can compare theirs with the best one. */
+function optionFacts(choice, g) {
+  const rows = (path, room, direction, distance) => [['Path', path], ['Room', room], ['Direction', direction], ['Distance', distance]];
+  if (!g) return rows('…', '…', '…', '…');
+  if (choice.action === 'pass') {
+    const t = g.teammates.find((o) => o.id === choice.target_player_id);
+    if (!t) return rows('—', '—', '—', '—');
+    const space = Math.round(t.receiver_space_m);
+    return rows(
+      t.lane_open ? 'lane open' : `blocked by #${t.blocked_by.join(', #')}`,
+      `${space} m to the nearest defender${t.receiver_space_m < 4 ? ' (marked)' : ''}`,
+      t.forward_m >= 0 ? `${Math.round(t.forward_m)} m forward` : `${Math.round(-t.forward_m)} m back`,
+      `${Math.round(t.distance_m)} m pass`,
+    );
+  }
+  if (choice.action === 'dribble') {
+    const near = g.pressure?.nearest_opponents?.[0];
+    return rows(
+      near ? `#${near.id} is ${Math.round(near.distance_m)} m away` : 'no defender close',
+      `${Math.round(g.free_space?.space_m ?? 0)} m of free space ahead`,
+      'carry it forward',
+      'short carry',
+    );
+  }
+  const s = g.shot;
+  return rows(
+    s?.lane_clear ? 'path to goal clear' : 'path to goal blocked',
+    s ? `${chanceText(s.xg)} chance to score` : '—',
+    'at goal',
+    s ? `${Math.round(s.distance_m)} m shot` : '—',
+  );
 }
 
 /**
  * Why a choice works or not, from the measured geometry (code decides what is correct, never the player).
+ * `mode` is TacticalContextAgent's "keep" or "progress" for this match situation.
  * Returns {tone: "good" | "ok" | "risky", text}.
  */
-export function callVerdict(choice, g, d) {
+export function callVerdict(choice, g, d, mode) {
   const same = d && choice.action === d.action
     && (choice.action !== 'pass' || choice.target_player_id === d.target_player_id);
   const byId = Object.fromEntries((g?.teammates ?? []).map((o) => [o.id, o]));
   const best = d?.action === 'pass' ? byId[d.target_player_id] : null;
   const waiting = d ? '' : ' The agents are still thinking…';
+  const bestLine = best
+    ? ` The best option, #${best.id}, is open with ${Math.round(best.receiver_space_m)} m of room and ${best.forward_m >= 0 ? `${Math.round(best.forward_m)} m forward` : `${Math.round(-best.forward_m)} m back`}.`
+    : d ? ` The agents chose to ${d.action}.` : '';
 
   if (choice.action === 'pass') {
     const t = byId[choice.target_player_id];
     if (!t) return { tone: 'risky', text: `#${choice.target_player_id} is not a passing option from here.` };
     if (!t.lane_open) {
-      return { tone: 'risky', text: `The lane to #${t.id} is blocked by #${t.blocked_by.join(' and #')}: that pass is likely to be cut out.${waiting}` };
+      return { tone: 'risky', text: `the lane to #${t.id} is blocked by #${t.blocked_by.join(' and #')}, so the pass is likely to be cut out.${bestLine}${waiting}` };
     }
-    if (!t.open) return { tone: 'risky', text: `#${t.id} is tightly marked: a defender can step in before the ball arrives.${waiting}` };
-    if (same) return { tone: 'good', text: `Same as the agents. #${t.id} is open with ${Math.round(t.receiver_space_m)} m of space.` };
-    const why = best && best.id !== t.id
-      ? ` The agents prefer #${best.id}: ${Math.round(best.receiver_space_m)} m of space${best.forward_m > t.forward_m + 2 ? ' and further forward' : ''}.`
-      : '';
-    return { tone: 'ok', text: `#${t.id} is open with ${Math.round(t.receiver_space_m)} m of space: a safe option.${why}${waiting}` };
+    if (!t.open) {
+      return { tone: 'risky', text: `#${t.id} is marked: the nearest defender is only ${Math.round(t.receiver_space_m)} m away and can step in before the ball arrives.${bestLine}${waiting}` };
+    }
+    if (same) return { tone: 'good', text: `same as the agents. #${t.id} is open with ${Math.round(t.receiver_space_m)} m of room.` };
+    if (!best) return { tone: 'ok', text: `#${t.id} is open with ${Math.round(t.receiver_space_m)} m of room: a safe option.${bestLine}${waiting}` };
+    if (t.forward_m < 0 && best.forward_m > 0) {
+      return mode === 'keep'
+        ? { tone: 'ok', text: `a safe pass ${Math.round(-t.forward_m)} m back keeps the ball, which is sensible when protecting a lead.${bestLine}` }
+        : { tone: 'ok', text: `the pass to #${t.id} is safe but goes ${Math.round(-t.forward_m)} m backwards, so your team loses ground.${bestLine}` };
+    }
+    if (t.receiver_space_m < best.receiver_space_m - 3) {
+      return { tone: 'ok', text: `#${t.id} is open but has less room (${Math.round(t.receiver_space_m)} m against ${Math.round(best.receiver_space_m)} m), so they will be closed down sooner.${bestLine}` };
+    }
+    if (t.distance_m > best.distance_m + 8) {
+      return { tone: 'ok', text: `the pass to #${t.id} is ${Math.round(t.distance_m)} m long; a longer pass gives defenders more time to react.${bestLine}` };
+    }
+    return { tone: 'ok', text: `#${t.id} is a good option too. The agents slightly prefer #${best.id} for a little more room or ground.${bestLine}` };
   }
   if (choice.action === 'dribble') {
     const space = Math.round(g?.free_space?.space_m ?? 0);
     const near = g?.pressure?.nearest_opponents?.[0];
-    if (same) return { tone: 'good', text: `Same as the agents. There is about ${space} m of space to carry the ball into.` };
+    if (same) return { tone: 'good', text: `same as the agents. There is about ${space} m of space to carry the ball into.` };
     if (space >= 8 && g?.pressure?.level !== 'high') {
-      return { tone: 'ok', text: `There is about ${space} m of space to carry the ball into, but a pass moves the ball faster.${waiting}` };
+      return { tone: 'ok', text: `there is about ${space} m of space to carry the ball into, but a pass moves the ball faster than you can run with it.${bestLine}${waiting}` };
     }
-    return { tone: 'risky', text: `Dribbling here runs into pressure${near ? `: #${near.id} is only ${Math.round(near.distance_m)} m away` : ''}.${waiting}` };
+    return { tone: 'risky', text: `dribbling here runs into pressure${near ? `: #${near.id} is only ${Math.round(near.distance_m)} m away` : ''}.${bestLine}${waiting}` };
   }
   const s = g?.shot;
-  if (!s) return { tone: 'risky', text: 'No shooting chance from here.' };
-  const chance = `${Math.round(s.xg * 100)}%`;
-  if (same) return { tone: 'good', text: `Same as the agents. From ${Math.round(s.distance_m)} m this shot scores about ${chance} of the time.` };
+  if (!s) return { tone: 'risky', text: 'no shooting chance from here.' };
+  const chance = chanceText(s.xg);
+  if (same) return { tone: 'good', text: `same as the agents. From ${Math.round(s.distance_m)} m this shot scores ${chance} of the time.` };
   return {
     tone: s.xg >= 0.1 && s.lane_clear ? 'ok' : 'risky',
-    text: `A shot from ${Math.round(s.distance_m)} m scores about ${chance} of the time${s.lane_clear ? '' : ', and the path to goal is blocked'}.${waiting}`,
+    text: `a shot from ${Math.round(s.distance_m)} m scores ${chance} of the time${s.lane_clear ? '' : ', and the path to goal is blocked'}.${bestLine}${waiting}`,
   };
+}
+
+function chanceText(xg) {
+  return xg < 0.01 ? 'less than 1%' : `about ${Math.round(xg * 100)}%`;
 }
 
 function moveText(d) {
