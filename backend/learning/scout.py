@@ -256,7 +256,7 @@ def validate(raw: dict, existing: list[str]) -> tuple[dict | None, list[dict]]:
     return entry, rejected
 
 
-def clean_sources(sources) -> list[str]:
+def clean_sources(sources, limit: int = MAX_SOURCES) -> list[str]:
     """Host names only (for the changelog/proposal, never for the knowledge file)."""
     hosts = []
     for s in _list(sources):
@@ -266,7 +266,17 @@ def clean_sources(sources) -> list[str]:
         host = host.removeprefix("www.")
         if re.fullmatch(r"[a-z0-9.-]+\.[a-z]{2,}", host) and host not in hosts:
             hosts.append(host)
-    return hosts[:MAX_SOURCES]
+    return hosts[:limit]
+
+
+def verify_sources(claimed: list[str], result_urls: list[str]) -> tuple[list[str], list[str]]:
+    """Split the agent's claimed domains into (found in the real search results, not found).
+
+    The agent writes its own source list, so only domains Web Search actually returned are kept.
+    """
+    real = clean_sources(result_urls, limit=100)
+    found = [d for d in claimed if any(d == r or d.endswith("." + r) or r.endswith("." + d) for r in real)]
+    return found, [d for d in claimed if d not in found]
 
 
 def _list(value) -> list:
@@ -388,7 +398,7 @@ class KnowledgeScout:
                 self._save(state)
                 existing_topics = [e["topic"] for e in state["entries"]]
 
-            raw, source = self._research(topic, reason, existing_topics)
+            raw, source, search = self._research(topic, reason, existing_topics)
             if source == "offline sample":
                 topic = raw["topic"]
 
@@ -396,7 +406,12 @@ class KnowledgeScout:
                 state = self._load()
                 sources = clean_sources(raw.get("sources")) if isinstance(raw, dict) else []
                 entry, rejected = validate(raw, knowledge_units(*self._knowledge_texts()))
-                proposal = self._new_proposal(state, topic, reason, source, entry, rejected, sources)
+                if search is not None:
+                    sources, unverified = verify_sources(sources, search["urls"])
+                    rejected += [{"item": "source", "text": d, "reason": "not among the web search results"}
+                                 for d in unverified]
+                    search = {"searches": search["searches"], "results": clean_sources(search["urls"], limit=20)}
+                proposal = self._new_proposal(state, topic, reason, source, entry, rejected, sources, search)
                 state["history"].append({"at": proposal["created"], "topic": topic, "proposal": proposal["id"]})
                 state["history"] = state["history"][-50:]
                 state["last_run"] = proposal["created"]
@@ -415,30 +430,36 @@ class KnowledgeScout:
             if _flag:
                 self._running = False
 
-    def _research(self, topic: str, reason: str, existing_topics: list[str]) -> tuple[dict, str]:
+    def _research(self, topic: str, reason: str, existing_topics: list[str]) -> tuple[dict, str, dict | None]:
+        """(reply, where it came from, what Web Search really returned or None if unknown)."""
         if self.runner is not None and self.agent_name:
             try:
-                reply = self.runner.run_agent(self.agent_name, scout_input(topic, reason, existing_topics))
+                message = scout_input(topic, reason, existing_topics)
+                search = None
+                if hasattr(self.runner, "run_agent_with_search"):
+                    reply, search = self.runner.run_agent_with_search(self.agent_name, message)
+                else:
+                    reply = self.runner.run_agent(self.agent_name, message)
                 data = extract_json(reply)
                 if data is not None:
                     data.setdefault("topic", topic)
-                    return data, "agent"
+                    return data, "agent", search
                 log.warning("KnowledgeScout reply was not JSON; using offline sample")
             except Exception:
                 log.exception("KnowledgeScout agent call failed; using offline sample")
-        return offline_sample(topic, existing_topics), "offline sample"
+        return offline_sample(topic, existing_topics), "offline sample", None
 
     def _knowledge_texts(self) -> list[str]:
         return [p.read_text(encoding="utf-8") for p in (self.doc_path, self.principles_path) if p.exists()]
 
     # ---- proposals --------------------------------------------------------------
 
-    def _new_proposal(self, state, topic, reason, source, entry, rejected, sources) -> dict:
+    def _new_proposal(self, state, topic, reason, source, entry, rejected, sources, search=None) -> dict:
         pid = f"P{state['next_proposal']}"
         state["next_proposal"] += 1
         proposal = {
             "id": pid, "created": _now().isoformat(timespec="seconds"), "topic": topic, "reason": reason,
-            "source": source, "sources": sources, "status": "pending" if entry else "rejected",
+            "source": source, "sources": sources, "search": search, "status": "pending" if entry else "rejected",
             "entry": entry, "rejected_items": rejected, "reviewed_by": None if entry else "validation",
             "reviewed_at": None, "version": None, "note": "" if entry else "nothing passed validation",
         }
@@ -606,6 +627,9 @@ def render_proposal(p: dict) -> str:
              f"- Research source: {p['source']}",
              "- Web domains consulted (not copied, never written to the knowledge file): "
              + (", ".join(p["sources"]) or "none")]
+    if p.get("search"):
+        lines.append(f"- Web searches run: {p['search']['searches']}; checked against their results: "
+                     + (", ".join(p["search"]["results"]) or "none"))
     if p.get("reviewed_by"):
         lines.append(f"- Reviewed by: {p['reviewed_by']} {p.get('reviewed_at') or ''}".rstrip())
     if p.get("note"):

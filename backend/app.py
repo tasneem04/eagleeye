@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 
 from . import geometry, training
 from .agents.pipeline import Pipeline
+from .analysis_cache import AnalysisCache, knowledge_tag
 from .learning.clarity import MAX_COMMENT_CHARS, MAX_EXPLANATION_CHARS, ClarityStore
 from .learning.knowledge_sync import KnowledgeSync
 from .learning.scout import KnowledgeScout
@@ -38,7 +39,12 @@ SCENARIO_DIR = ROOT / "data" / "scenarios"
 FRONTEND_DIR = ROOT / "frontend"
 KNOWLEDGE_DIR = ROOT / "knowledge"
 CLARITY_PATH = ROOT / "data" / "feedback" / "clarity.jsonl"
+CACHE_PATH = ROOT / "data" / "cache" / "analysis.json"
 ANALYSIS_CACHE_SIZE = 200
+# Warmed at startup so a judge's first clicks are instant: the key moment's ball carrier and two
+# open teammates, in the scenario's situation and the selector's presets (frontend/js/main.js).
+WARMUP_SITUATIONS = [None, {"minute": 88, "score": {"home": 1, "away": 0}},
+                     {"minute": 85, "score": {"home": 0, "away": 1}}]
 LEVEL = Literal["rookie", "academy", "pro"]
 
 load_dotenv(ROOT / ".env")
@@ -65,11 +71,13 @@ async def lifespan(app: FastAPI):
     # Where each trial's free player is (for choosing drills); kept server-side only.
     app.state.trial_meta = [training.trial_meta(app.state.scenarios[t["scenario_id"]], t)
                             for t in app.state.trials.values()]
-    app.state.analysis_cache = {}
     app.state.limiter = RateLimiter(enabled=os.getenv("RATE_LIMITS", "on").strip().lower() != "off")
     app.state.budget = AgentBudget(int(_float_env("AGENT_CALLS_PER_HOUR", 600)))
     app.state.clarity = ClarityStore(CLARITY_PATH)
     pipeline = app.state.pipeline = Pipeline.from_env()
+    # Only real agent answers are worth keeping on disk; mock answers are instant anyway.
+    app.state.analysis_cache = AnalysisCache(CACHE_PATH if pipeline.mode == "foundry" else None,
+                                             _cache_tag(app), ANALYSIS_CACHE_SIZE)
     sync = None
     if pipeline.foundry is not None:
         sync = KnowledgeSync(
@@ -89,6 +97,8 @@ async def lifespan(app: FastAPI):
     hours = _float_env("SCOUT_INTERVAL_HOURS")
     if hours > 0:
         threading.Thread(target=_scout_timer, args=(app.state.scout, hours, stop), daemon=True).start()
+    if pipeline.mode == "foundry" and os.getenv("WARMUP", "on").strip().lower() != "off":
+        threading.Thread(target=_warm_up, args=(app, stop), daemon=True).start()
     yield
     stop.set()
     pipeline.close()
@@ -109,6 +119,65 @@ def _scout_timer(scout: KnowledgeScout, hours: float, stop: threading.Event) -> 
             scout.run()
         except Exception:
             logging.getLogger("eagleeye.scout").exception("Scheduled scout run failed")
+
+
+def _cache_tag(app: FastAPI) -> str:
+    return knowledge_tag(KNOWLEDGE_DIR, [f"{s.key}={s.agent_name}" for s in app.state.pipeline.stages])
+
+
+def _warm_up(app: FastAPI, stop: threading.Event) -> None:
+    """Ask the agents about the key moment once, in the background, so the first visitors don't wait."""
+    log = logging.getLogger("eagleeye.warmup")
+    done = 0
+    for scenario in app.state.scenarios.values():
+        if scenario["id"].startswith("scan_drill") or "key_frame" not in scenario:
+            continue  # training drills have no Analyse panel
+        frame_index = scenario["key_frame"]
+        owner = scenario["frames"][frame_index]["ball"]["owner"]
+        if owner is None:
+            continue
+        players = [owner, *_analyze_moment(scenario, frame_index, owner)["open_teammates"][:2]]
+        for situation in WARMUP_SITUATIONS:
+            for player_id in players:
+                if stop.is_set():
+                    return
+                try:
+                    _, cached = _analysis(app, scenario, frame_index, player_id, situation)
+                    done += not cached
+                except Exception:
+                    log.exception("Warm-up of #%s failed", player_id)
+    log.info("Warm-up finished: %d new answers", done)
+
+
+def _analysis(app: FastAPI, scenario: dict, frame_index: int, player_id: int,
+              situation: dict | None) -> tuple[dict, bool]:
+    """The agents' answer for one click, from the cache when this exact click was answered before."""
+    situation = situation or scenario["match_situation"]
+    cache = app.state.analysis_cache
+    cache.retag(_cache_tag(app))  # an approved KnowledgeScout note makes old answers stale
+    key = _cache_key(scenario["id"], frame_index, player_id, situation)
+    if key in cache:
+        return cache[key], True
+
+    pipeline = app.state.pipeline
+    # Above the hourly budget of agent calls, answer with the offline text instead of spending more.
+    offline = not app.state.budget.take(pipeline.agent_calls())
+    geo = _analyze_moment(scenario, frame_index, player_id)
+    start = time.perf_counter()
+    stages = pipeline.run(scenario, scenario["frames"][frame_index], player_id, geo, situation, offline=offline)
+    result = {
+        "mode": pipeline.mode,
+        "situation": situation,
+        "geometry": geo,
+        "stages": stages,
+        "total_ms": int((time.perf_counter() - start) * 1000),
+        "cached": False,
+        "budget_reached": offline and pipeline.mode == "foundry",
+    }
+    # Answers hit by a temporary failure are not kept, so the next click tries the agents again.
+    if pipeline.mode == "foundry" and not offline and not any(s["retryable"] for s in stages):
+        cache.put(key, result)
+    return result, False
 
 
 app = FastAPI(
@@ -208,39 +277,15 @@ def moment_geometry(body: MomentRequest, request: Request):
 
 @app.post("/api/analyze")
 def analyze(body: MomentRequest, request: Request):
-    scenario, frame = _resolve(request, body)
-    geo = _analyze_moment(scenario, body.frame_index, body.player_id)
-    situation = body.situation.model_dump() if body.situation else scenario["match_situation"]
-    pipeline = request.app.state.pipeline
-
+    scenario, _ = _resolve(request, body)
+    situation = body.situation.model_dump() if body.situation else None
     # The same click in the same match situation gets the same answer: reuse it instead of
-    # waiting ~10 s for the agents again. Answers hit by a temporary failure are not kept.
-    key = _cache_key(body.scenario_id, body.frame_index, body.player_id, situation)
-    cache = request.app.state.analysis_cache
-    if key in cache:
-        cached = cache[key]
-        return {**cached, "stages": public_stages(cached["stages"], request), "cached": True}
-
-    request.app.state.limiter.check(request, "analyze")
-    # Above the hourly budget of agent calls, answer with the offline text instead of spending more.
-    offline = not request.app.state.budget.take(pipeline.agent_calls())
-
-    start = time.perf_counter()
-    stages = pipeline.run(scenario, frame, body.player_id, geo, situation, offline=offline)
-    result = {
-        "mode": pipeline.mode,
-        "situation": situation,
-        "geometry": geo,
-        "stages": stages,
-        "total_ms": int((time.perf_counter() - start) * 1000),
-        "cached": False,
-        "budget_reached": offline and pipeline.mode == "foundry",
-    }
-    if pipeline.mode == "foundry" and not offline and not any(s["retryable"] for s in stages):
-        if len(cache) >= ANALYSIS_CACHE_SIZE:
-            cache.pop(next(iter(cache)))  # drop the oldest
-        cache[key] = result
-    return {**result, "stages": public_stages(stages, request)}
+    # waiting ~15 s for the agents again. Only new clicks count against the rate limit.
+    if _cache_key(body.scenario_id, body.frame_index, body.player_id,
+                  situation or scenario["match_situation"]) not in request.app.state.analysis_cache:
+        request.app.state.limiter.check(request, "analyze")
+    result, cached = _analysis(request.app, scenario, body.frame_index, body.player_id, situation)
+    return {**result, "stages": public_stages(result["stages"], request), "cached": cached}
 
 
 @app.get("/api/knowledge")

@@ -184,7 +184,8 @@ export class ScoutPanel {
   card(prop) {
     const card = node('article', 'scout-card');
     card.append(node('h3', '', `${prop.id} · ${prop.topic}`));
-    card.append(node('p', 'scout-meta', `${prop.reason} · source: ${prop.source}${prop.sources.length ? ` (${prop.sources.join(', ')})` : ''}`));
+    const searched = prop.search ? ` · ${prop.search.searches} web search${prop.search.searches === 1 ? '' : 'es'}, sources checked` : '';
+    card.append(node('p', 'scout-meta', `${prop.reason} · source: ${prop.source}${prop.sources.length ? ` (${prop.sources.join(', ')})` : ''}${searched}`));
     const e = prop.entry;
     if (e?.summary) card.append(node('p', '', e.summary));
     const ul = node('ul');

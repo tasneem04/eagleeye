@@ -4,6 +4,13 @@
 # "Did you understand?" flags from visitors (review queue for the coach; never committed)
 data/feedback/
 
+# Saved agent answers (rebuilt by the startup warm-up)
+data/cache/
+
+# KnowledgeScout working state: proposals waiting for review (approvals are recorded in knowledge/CHANGELOG.md)
+knowledge/proposals/
+knowledge/scout_state.json
+
 # Python
 .venv/
 __pycache__/

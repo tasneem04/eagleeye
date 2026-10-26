@@ -16,6 +16,14 @@ az login                        # Foundry agents use Entra ID (DefaultAzureCrede
 
 Open http://localhost:8000. Set `EAGLEEYE_MODE=mock` in `.env` to run without Azure.
 
+At startup the app asks the agents about the key moment in the background (`WARMUP=on`), so the first clicks answer instantly. Answers are saved in `data/cache/` and dropped automatically when the knowledge files or the agent chain change.
+
+Check that the agents in Foundry match this repo (model, tools, temperature, instructions):
+
+```powershell
+.\.venv\Scripts\python.exe scripts/check_agents.py
+```
+
 ## Tests
 
 ```powershell
@@ -75,7 +83,8 @@ Nothing a player does changes the coaching knowledge. Only KnowledgeScout resear
   - `ADMIN_TOKEN` set as an App Service setting;
   - HTTPS only;
   - a managed identity with only the Foundry User (Azure AI User) role, and no keys;
-  - `SCOUT_INTERVAL_HOURS=0` and `EAGLEEYE_ENV=production`.
+  - `SCOUT_INTERVAL_HOURS=0` and `EAGLEEYE_ENV=production`;
+  - after the deploy, `scripts/check_agents.py` passes and every card on the public link says "Microsoft Foundry agent".
 
   Give judges the admin token only in the submission's private testing notes.
 

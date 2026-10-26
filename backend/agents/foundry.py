@@ -23,6 +23,20 @@ def final_text(response) -> str:
     return response.output_text
 
 
+def web_search_results(response) -> dict:
+    """{"searches": n, "urls": [...]} from the web_search_call items of a response."""
+    searches, urls = 0, []
+    for item in response.output or []:
+        if getattr(item, "type", None) != "web_search_call":
+            continue
+        searches += 1
+        for source in getattr(getattr(item, "action", None), "sources", None) or []:
+            url = source.get("url") if isinstance(source, dict) else getattr(source, "url", None)
+            if url:
+                urls.append(url)
+    return {"searches": searches, "urls": urls}
+
+
 class FoundryAgents:
     def __init__(self, endpoint: str):
         self._credential = DefaultAzureCredential()
@@ -41,14 +55,25 @@ class FoundryAgents:
             return self._clients[agent_name]
 
     def run_agent(self, agent_name: str, text: str) -> str:
+        return final_text(self._respond(agent_name, text))
+
+    def run_agent_with_search(self, agent_name: str, text: str) -> tuple[str, dict]:
+        """The reply, plus what the Web Search tool really did: how many searches, and the result URLs.
+
+        The model's own list of sources is only a claim; these results let code check it.
+        """
+        response = self._respond(agent_name, text, include=["web_search_call.action.sources"])
+        return final_text(response), web_search_results(response)
+
+    def _respond(self, agent_name: str, text: str, **extra):
         client = self._client_for(agent_name)
-        # Each analysis is a fresh, single-turn conversation.
+        # Each call is a fresh, single-turn conversation.
         conversation = client.conversations.create()
-        response = client.responses.create(
+        return client.responses.create(
             conversation=conversation.id,
             input=[{"role": "user", "content": text}],
+            extra_body=extra or None,
         )
-        return final_text(response)
 
     def close(self) -> None:
         self._project.close()

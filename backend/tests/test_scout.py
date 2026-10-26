@@ -322,3 +322,35 @@ def test_every_offline_sample_is_a_topic_in_the_rotation():
     assert set(SAMPLES) <= set(sc.TOPICS)
     for topic in SAMPLES:
         assert sc.offline_sample(topic)["topic"] == topic
+
+
+class SearchingRunner(FakeRunner):
+    """Like the Foundry runner: also reports what Web Search really returned."""
+
+    def __init__(self, reply, urls):
+        super().__init__(reply)
+        self.urls = urls
+
+    def run_agent_with_search(self, name, text):
+        return self.run_agent(name, text), {"searches": 1, "urls": self.urls}
+
+
+def test_only_sources_the_web_search_returned_are_kept(tmp_path):
+    reply = {**GOOD, "sources": ["thefa.com", "made-up-site.org", "learn.englandfootball.com"]}
+    urls = ["https://www.thefa.com/bootroom/x", "https://learn.englandfootball.com/sessions/y", "https://veo.com/z"]
+    scout, kdir, _ = make_scout(tmp_path, runner=SearchingRunner(reply, urls), agent_name="KnowledgeScout")
+    proposal = scout.get_proposal(scout.run()["proposal"])
+    assert proposal["sources"] == ["thefa.com", "learn.englandfootball.com"]
+    assert {"item": "source", "text": "made-up-site.org", "reason": "not among the web search results"} \
+        in proposal["rejected_items"]
+    assert proposal["search"] == {"searches": 1, "results": ["thefa.com", "learn.englandfootball.com", "veo.com"]}
+    assert "Web searches run: 1" in (kdir / "proposals" / f"{proposal['id']}.md").read_text(encoding="utf-8")
+
+
+def test_web_search_results_are_read_from_the_response():
+    from types import SimpleNamespace as NS
+    from backend.agents.foundry import web_search_results
+
+    call = NS(type="web_search_call", action=NS(sources=[NS(url="https://a.org/1"), {"url": "https://b.org/2"}]))
+    response = NS(output=[call, NS(type="message", content=[])])
+    assert web_search_results(response) == {"searches": 1, "urls": ["https://a.org/1", "https://b.org/2"]}
