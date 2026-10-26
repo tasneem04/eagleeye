@@ -1,5 +1,5 @@
 import * as api from './api.js';
-import { drawOverlays, isOffBall } from './overlays.js';
+import { drawDecision, drawOverlays, isOffBall } from './overlays.js';
 import { explanationText, renderPanel } from './panel.js';
 import { COLORS, PitchView } from './pitch.js';
 import { Playback } from './playback.js';
@@ -146,6 +146,10 @@ async function select(player, frameIndex) {
     const geometry = await api.getGeometry(moment);
     if (requestId !== state.requestId) return;
     state.selection.geometry = geometry;
+    // Your call first: with the ball, the player decides before seeing the agents' answer.
+    if (geometry.selected.has_ball && state.config.stages.length) {
+      state.selection.call = { asking: true, revealed: false, choice: null };
+    }
     render();
 
     if (!state.config.stages.length) return;
@@ -225,7 +229,26 @@ el.panel.addEventListener('click', (e) => {
   if (state.mode !== 'analyse') return;
   const button = e.target.closest('[data-clarity]');
   if (button) sendClarity(button.dataset.clarity);
+  const call = e.target.closest('[data-call]')?.dataset.call;
+  if (call) onCall(call);
 });
+
+// ---- "Your call first": choose, then compare with the agents (trial and error, no score) ----
+
+function onCall(action) {
+  const sel = state.selection;
+  if (!sel?.call) return;
+  if (action === 'skip') sel.call = { asking: false, revealed: true, choice: null };
+  else if (action === 'again') sel.call = { asking: true, revealed: true, choice: null };
+  else makeChoice({ action });
+  render();
+}
+
+function makeChoice(choice) {
+  const sel = state.selection;
+  sel.call = { asking: false, revealed: true, choice };
+  render();
+}
 
 function clearSelection() {
   state.requestId++;
@@ -285,12 +308,16 @@ function draw(now) {
   view.drawSides(analyseSides());
   const sel = state.selection;
   let focusIds = null;
-  if (sel?.geometry) {
+  const hideAnswer = sel?.call && !sel.call.revealed; // no lanes or arrows until the player has chosen
+  if (sel?.geometry && !hideAnswer) {
     const decision = sel.analysis?.stages.find((s) => s.key === 'decision')?.data ?? null;
-    drawOverlays(view, sel.geometry, new Map(players.map((p) => [p.id, p])), now, {
+    const positions = new Map(players.map((p) => [p.id, p]));
+    drawOverlays(view, sel.geometry, positions, now, {
       decision,
       heatmap: el.heatmap.checked,
     });
+    const me = positions.get(sel.geometry.selected.id);
+    if (sel.call?.choice && me) drawDecision(view, sel.call.choice, sel.geometry, me, positions, '#ffffff');
     if (isOffBall(sel.geometry)) {
       // Off the ball: only the runner and the passer matter on screen.
       focusIds = new Set([sel.player.id, sel.geometry.space_value.best_position.pass_from]);
@@ -322,7 +349,8 @@ function syncControls() {
   el.play.setAttribute('aria-label', playback.playing ? 'Pause' : 'Play');
 
   let hint = '';
-  if (playback.playing) hint = 'Pause, then click a player';
+  if (state.selection?.call?.asking) hint = 'Your call: click a teammate to pass, or choose Dribble or Shoot';
+  else if (playback.playing) hint = 'Pause, then click a player';
   else if (!state.selection && state.pov.on && state.pov.playerId != null) hint = `Following #${state.pov.playerId}: click a player to see their options`;
   else if (!state.selection) hint = 'Click any player to see what they should see';
   el.hint.textContent = hint;
@@ -365,7 +393,7 @@ function povMarks(me) {
   const highlights = new Map();
   const spots = [];
   const sel = state.selection;
-  if (!sel?.geometry || sel.player.id !== me.id) return { highlights, spots };
+  if (!sel?.geometry || sel.player.id !== me.id || (sel.call && !sel.call.revealed)) return { highlights, spots };
   const g = sel.geometry;
   if (isOffBall(g)) {
     const best = g.space_value.best_position;
@@ -454,6 +482,12 @@ el.canvas.addEventListener('click', (e) => {
   const rect = el.canvas.getBoundingClientRect();
   const hit = view.hitTest(e.clientX - rect.left, e.clientY - rect.top, playback.current().players);
   if (!hit) return;
+  const sel = state.selection;
+  if (sel?.call?.asking && hit.team === sel.player.team) {
+    // Answering "What would you do?": a teammate is a pass, yourself is no choice.
+    if (hit.id !== sel.player.id) makeChoice({ action: 'pass', target_player_id: hit.id });
+    return;
+  }
   playback.pause();
   const frameIndex = playback.nearestKeyframe();
   playback.seekToFrame(frameIndex); // analysis runs on exact keyframes only

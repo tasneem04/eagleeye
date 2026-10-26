@@ -334,6 +334,23 @@ details.how[open] > summary::after { transform: rotate(90deg); }
 details.how > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius); }
 .how-body { display: flex; flex-direction: column; gap: 14px; padding: 0 12px 12px; }
 
+/* "Your call first": the player decides, then sees the agents' answer next to theirs */
+.card.call { border-color: rgba(56, 189, 248, 0.55); }
+.call-question { font-size: 18px !important; margin: 4px 0 6px !important; }
+.call-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.link-btn { background: none; border: 0; color: var(--muted); text-decoration: underline; cursor: pointer; font-size: 13px; padding: 4px; }
+.link-btn:hover { color: var(--text); }
+.call-note { margin: 10px 0 0; }
+.verdict-card { border-left-width: 4px; }
+.verdict-card.tone-good { border-left-color: var(--open); }
+.verdict-card.tone-ok { border-left-color: var(--accent); }
+.verdict-card.tone-risky { border-left-color: var(--blocked); }
+.call-compare { display: flex; gap: 28px; margin-bottom: 8px; }
+.call-compare strong { display: block; font-size: 20px; margin-top: 2px; }
+.call-compare .you { color: #ffffff; }
+.call-compare .agents { color: var(--accent); }
+.verdict-text { margin: 0 0 12px; font-size: 15px; line-height: 1.5; }
+
 /* First-visit guide above the pitch */
 .start-here {
   display: flex;
