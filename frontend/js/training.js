@@ -9,6 +9,7 @@ import { COLORS, PitchView } from './pitch.js';
 import { Playback } from './playback.js';
 import { PovView } from './pov.js';
 import * as profiles from './profiles.js';
+import { drawReplayMarks, replayFrame } from './replay.js';
 
 const SCAN_ON = 45;      // face turned this far from the ball = one scan
 const SCAN_RESET = 20;    // must come back this close before the next scan counts
@@ -145,6 +146,7 @@ export class Training {
 
   async #brief(trial) {
     this.trial = trial;
+    this.replay = null;
     this.scenario = await this.#scenario(trial.scenario_id);
     this.playback = null;
     this.result = null;
@@ -316,7 +318,8 @@ export class Training {
   draw(now) {
     if (!this.active || !this.scenario) return;
     if (this.phase === 'reveal' && this.result) {
-      this.#drawReveal();
+      if (this.replay?.data) this.#drawReplay(now);
+      else this.#drawReveal();
       return;
     }
     const state = this.playback
@@ -334,6 +337,57 @@ export class Training {
     const screenSpeed = Math.abs(this.gaze.velocity) * (this.playback?.speed ?? 1);
     const blur = clamp((screenSpeed - MOVING_DEG_S) / 350, 0, 1) * 5;
     this.pov.draw({ players: state.players.filter((p) => p.id !== me.id), ball: state.ball, blur });
+  }
+
+  /** "What happens next" after the drill: the same replay as in Analyse, played from the arrival moment. */
+  #drawReplay(now) {
+    const v = this.view;
+    const frame = this.scenario.frames[this.trial.arrival_frame];
+    const r = replayFrame(this.replay, frame.players, now);
+    v.begin();
+    v.drawPitch();
+    v.drawSides(this.#sides());
+    v.drawPlayers(r.players, { selectedId: this.trial.receiver });
+    v.drawBall(r.ball);
+    drawReplayMarks(v, r, this.replay.data.tone);
+  }
+
+  async #playReplay(who) {
+    const best = this.result?.best;
+    const choice = who === 'best'
+      ? { action: best.action, target_player_id: best.target_player_id }
+      : { action: this.choice.action, target_player_id: this.choice.action === 'pass' ? this.choice.target : null };
+    this.replay = { who, loading: true };
+    this.#render();
+    try {
+      const data = await api.whatNext({ scenario_id: this.trial.scenario_id, frame_index: this.trial.arrival_frame,
+        player_id: this.trial.receiver }, choice);
+      if (this.replay?.who === who) this.replay = { who, data, t0: performance.now() };
+    } catch (err) {
+      this.replay = { who, error: err.message };
+    }
+    this.#render();
+  }
+
+  #replayHtml() {
+    const r = this.replay;
+    let body = '';
+    if (r?.loading) body = '<div class="loading"><span class="spinner"></span>Playing it out…</div>';
+    else if (r?.error) body = `<div class="warning">${esc(r.error)}</div>`;
+    else if (r?.data) body = `<p class="replay-text tone-${esc(r.data.tone)}">${esc(r.data.text)}</p>`;
+    const dribbleNote = this.choice?.action === 'dribble' && r?.who === 'yours'
+      ? '<p class="sub">The replay carries the ball into the most open space, not to the exact spot you clicked.</p>' : '';
+    return `
+      <div class="card replay">
+        <div class="answer-label">What happens next${r ? ` · ${r.who === 'best' ? 'the best option' : 'your choice'}` : ''}</div>
+        ${body}${dribbleNote}
+        <div class="call-buttons">
+          <button class="choice-btn" data-train="replay-mine">▶ Your choice</button>
+          <button class="choice-btn" data-train="replay-best">▶ The best option</button>
+          ${r?.data ? '<button class="link-btn" data-train="replay-off">Back to the picture</button>' : ''}
+        </div>
+        ${r?.data ? `<p class="sub">${esc(r.data.caption)}</p>` : ''}
+      </div>`;
   }
 
   #drawReveal() {
@@ -537,6 +591,7 @@ export class Training {
       <div class="card">
         <h2>Player's Eye training</h2>
         <div class="sub">See it like a player, then check it with the eagle eye. Train ${this.minEvidence} drills and EagleEye learns how you scan.</div>
+        <p class="sub size-note">${esc(this.#sizeNote())}</p>
         <p class="brief">You are <strong>${esc(teamName)} #${me.id}</strong> (${esc(me.role)}). <strong>#${this.trial.passer}</strong> is about to pass to you.
         Scan before the ball arrives, then choose what to do.</p>
         <div class="seg" role="radiogroup" aria-label="Level">
@@ -604,6 +659,16 @@ export class Training {
         ${suggest}
         ${button}
       </div>`;
+  }
+
+  /** Why there are fewer players than a match: small-sided drills, still with a keeper and a back line. */
+  #sizeNote() {
+    const players = this.scenario.frames[this.trial.arrival_frame].players;
+    const mine = players.filter((p) => p.team === this.trial.team).length;
+    const theirs = players.length - mine;
+    if (this.trial.kind !== 'drill') return `Match moment: ${mine} v ${theirs}.`;
+    return `${LEVEL_NAMES[this.trial.level] ?? ''} small-sided game: ${mine} v ${theirs}, with a keeper and a back line. `
+      + 'Fewer players than a match, so you can learn to scan.';
   }
 
   #targetScans() {
@@ -696,6 +761,7 @@ export class Training {
         <div class="agent-output"><p>${esc(debrief.output)}</p></div>
         <div class="agent-meta"><span>${debrief.source === 'foundry' ? 'Microsoft Foundry agent' : 'Offline coach'}</span><span>${(debrief.latency_ms / 1000).toFixed(1)} s</span></div>
       </div>
+      ${this.#replayHtml()}
       ${clarityCard(this.clarity)}
       ${this.#focusHtml(true)}
       <div class="card">
@@ -756,6 +822,15 @@ export class Training {
       return;
     }
     if (this.#onProfileAction(action, btn)) return;
+    if (action === 'replay-mine' || action === 'replay-best') {
+      this.#playReplay(action === 'replay-best' ? 'best' : 'yours');
+      return;
+    }
+    if (action === 'replay-off') {
+      this.replay = null;
+      this.#render();
+      return;
+    }
     if (action === 'reset-progress') {
       profiles.resetHistory();
       this.codeShown = '';

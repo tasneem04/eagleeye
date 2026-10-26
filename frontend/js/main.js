@@ -4,6 +4,7 @@ import { explanationText, renderPanel } from './panel.js';
 import { COLORS, PitchView } from './pitch.js';
 import { Playback } from './playback.js';
 import { PovView } from './pov.js';
+import { drawReplayMarks, replayFrame } from './replay.js';
 import { ScoutPanel } from './scout.js';
 import { Training } from './training.js';
 
@@ -285,41 +286,6 @@ async function playReplay(choice, who) {
   render();
 }
 
-/** Players and ball at this instant of the replay (positions eased from start to end). */
-function replayPositions(replay, players, now) {
-  const { data } = replay;
-  const k = Math.min(1, (now - replay.t0) / 1000 / data.duration_s);
-  const e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2; // ease in-out
-  const start = new Map(data.start.players.map((p) => [p.id, p]));
-  const end = new Map(data.end.players.map((p) => [p.id, p]));
-  const lerp = (a, b) => ({ x: a.x + (b.x - a.x) * e, y: a.y + (b.y - a.y) * e });
-  return {
-    done: k >= 1,
-    players: players.map((p) => (start.has(p.id) ? { ...p, ...lerp(start.get(p.id), end.get(p.id)) } : p)),
-    ball: { ...lerp(data.start.ball, data.end.ball), owner: null },
-  };
-}
-
-function drawReplayLabel(replay) {
-  const { ctx } = view;
-  const { ball } = replay.data.end;
-  const [x, y] = view.toPx(ball.x, ball.y);
-  const text = replay.data.label;
-  ctx.save();
-  ctx.font = '700 13px Inter, system-ui, sans-serif';
-  const w = ctx.measureText(text).width + 16;
-  const colour = { good: COLORS.open, ok: '#f5c542', risky: '#ef4444' }[replay.data.tone] ?? '#f5c542';
-  ctx.fillStyle = 'rgba(10, 15, 26, 0.88)';
-  ctx.strokeStyle = colour;
-  ctx.lineWidth = 2;
-  ctx.fillRect(x - w / 2, y - view.playerRadius - 34, w, 24);
-  ctx.strokeRect(x - w / 2, y - view.playerRadius - 34, w, 24);
-  ctx.fillStyle = colour;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, x, y - view.playerRadius - 22);
-  ctx.restore();
-}
 
 function clearSelection() {
   state.requestId++;
@@ -380,10 +346,10 @@ function draw(now) {
   const sel = state.selection;
   if (sel?.replay?.data) {
     // "What happens next": the replay replaces the frozen moment until "Back to the moment".
-    const r = replayPositions(sel.replay, players, now);
+    const r = replayFrame(sel.replay, players, now);
     view.drawPlayers(r.players, { selectedId: sel.player.id });
     view.drawBall(r.ball);
-    if (r.done) drawReplayLabel(sel.replay);
+    drawReplayMarks(view, r, sel.replay.data.tone);
     return;
   }
   let focusIds = null;

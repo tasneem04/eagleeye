@@ -34,7 +34,7 @@ def test_dribble_moves_the_carrier_and_is_repeatable():
     first, again = replay({"action": "dribble"}), replay({"action": "dribble"})
     assert first == again
     assert 6 in first["moved"]
-    assert first["caption"].startswith("Simple replay")
+    assert "simple replay" in first["caption"].lower()
 
 
 def test_only_the_ball_carrier_and_teammates(make_client):
@@ -58,3 +58,27 @@ def test_pass_to_an_offside_player_shows_the_flag():
         {"id": 20, "team": "away", "x": 70, "y": 30, "role": "centre back"}]}
     r = consequence.what_next(frame, 1, {"home": "right", "away": "left"}, {"action": "pass", "target_player_id": 9})
     assert r["outcome"] == "offside" and "Offside" in r["label"]
+
+
+def _near_goal():
+    return {"time": 0, "ball": {"x": 60, "y": 50, "owner": 1}, "players": [
+        {"id": 1, "team": "home", "x": 60, "y": 50, "role": "cm"},
+        {"id": 9, "team": "home", "x": 78, "y": 50, "role": "st"},
+        {"id": 12, "team": "away", "x": 96, "y": 50, "role": "goalkeeper"},
+        {"id": 20, "team": "away", "x": 88, "y": 15, "role": "centre back"},
+        {"id": 21, "team": "away", "x": 88, "y": 85, "role": "centre back"}]}
+
+
+def test_the_attack_goes_on_to_a_shot_with_its_chance():
+    r = consequence.what_next(_near_goal(), 1, {"home": "right", "away": "left"}, {"action": "pass", "target_player_id": 9})
+    assert r["outcome"] == "completed" and len(r["steps"]) >= 2
+    assert r["steps"][-1]["label"].startswith("Shot") and "chance" in r["steps"][-1]["label"]
+    assert r["end"]["ball"]["x"] == 100.0                     # the ball reaches the goal line
+    assert "scores" in r["text"]
+
+
+def test_too_far_out_shows_the_chance_but_no_shot():
+    scenario = load_scenarios()["build_up_triangle"]
+    r = consequence.what_next(FRAME, 6, scenario["attacking_direction"], {"action": "pass", "target_player_id": 3}, PREV)
+    last = r["steps"][-1]
+    assert "aim" in last and "a shot now" in last["label"] and "next pass" in r["text"]

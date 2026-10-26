@@ -22,7 +22,16 @@ CHASERS = 2                # the defenders who react to the ball
 STOP_SHORT_M = 1.0         # a chasing defender stops this far from the ball
 PRESSED_M = 2.0            # closer than this when the ball arrives: likely to lose it
 CLOSED_M = 4.0             # closer than this: under pressure, little time
-CAPTION = "Simple replay from the same reach-time model: the nearest defenders run at the ball."
+CONTINUE_S = 2.5           # after the choice, the player on the ball runs at goal for at most this long
+ENGAGED_REACTION_S = 0.3   # defenders are already moving by then, so they react faster
+SHOOT_FROM_M = 16.0        # the run stops about this far out to shoot
+SHOOT_RANGE_M = 30.0       # beyond this, no shot: the attack just goes on
+KEEPER_OUT_M = 2.5         # the keeper steps off his line towards the ball
+RUN_ANGLES_DEG = (0, -15, 15, -30, 30, -40, 40)  # attackers run into the gap, not straight into a defender
+CLOSE_MARGIN_S = 0.2       # stop the run when a defender could arrive this soon after you: closed down
+TACKLE_MARGIN_S = 0.3      # a tackle only if a defender is clearly there first
+CAPTION = ("What could happen next, from the same reach-time and shot-chance models: the nearest defenders "
+           "run at the ball. A simple replay, not a match simulation.")
 
 
 def what_next(frame: dict, player_id: int, attacking_direction: dict, choice: dict,
@@ -53,11 +62,83 @@ def what_next(frame: dict, player_id: int, attacking_direction: dict, choice: di
     else:
         raise ValueError(f"unknown action '{action}'")
 
-    moves, ball_end = result.pop("moves"), result.pop("ball")
-    start = {"ball": _units(me["pos"]), "players": [{"id": p["id"], **_units(p["pos"])} for p in players.values()]}
-    end = {"ball": _units(ball_end), "players": [
-        {"id": p["id"], **_units(moves.get(p["id"], p["pos"]))} for p in players.values()]}
-    return {**result, "start": start, "end": end, "moved": sorted(moves), "caption": CAPTION}
+    # Step 1 is the choice itself; then, if the team still has the ball, the attack goes on towards goal.
+    pos = {pid: p["pos"] for pid, p in players.items()}
+    start = _snapshot(pos, me["pos"])
+    moves, ball_end, holder = result.pop("moves"), result.pop("ball"), result.pop("holder", None)
+    pos.update(moves)
+    steps = [{"duration_s": result["duration_s"], "label": result["label"], **_snapshot(pos, ball_end)}]
+    moved = set(moves)
+    if holder is not None:
+        more, text = _attack_on(holder, pos, players, me["team"], sign)
+        steps += more
+        moved |= {pid for s in more for pid in s.pop("_moved")}
+        result["text"] += " " + text
+        result["label"] = steps[-1]["label"]
+    result["duration_s"] = _r(sum(s["duration_s"] for s in steps))
+    return {**result, "start": start, "steps": steps, "end": steps[-1], "moved": sorted(moved), "caption": CAPTION}
+
+
+def _snapshot(pos: dict, ball) -> dict:
+    return {"ball": _units(ball), "players": [{"id": pid, **_units(p)} for pid, p in pos.items()]}
+
+
+def _attack_on(holder: int, pos: dict, players: dict, team: str, sign: int) -> tuple[list[dict], str]:
+    """The player on the ball runs at goal (stopping if a defender gets there first), then shoots if in range."""
+    goal = (geometry.PITCH_LENGTH_M if sign == 1 else 0.0, geometry.PITCH_WIDTH_M / 2)
+    here = pos[holder]
+    opp_ids = [pid for pid, p in players.items() if p["team"] != team]
+    length = distance(here, goal)
+    carry = max(0.0, min(DRIBBLE_SPEED_MPS * CONTINUE_S, length - SHOOT_FROM_M))
+    steps, text = [], ""
+    if carry >= 1:
+        run = _best_run(here, goal, carry, [pos[o] for o in opp_ids], opp_ids)
+        if run["tackled_by"] is not None:
+            who, point = run["tackled_by"], run["end"]
+            pos[holder], pos[who] = point, point
+            steps.append({"duration_s": _r(max(0.5, run["metres"] / DRIBBLE_SPEED_MPS)), "label": f"Tackled by #{who}",
+                          "_moved": [holder, who], **_snapshot(pos, point)})
+            return steps, f"Then #{holder} tries to run at goal, but #{who} is already in the way and wins it back."
+        end, metres = run["end"], run["metres"]
+        if metres >= 1:
+            run_s = metres / DRIBBLE_SPEED_MPS
+            chase, _, closest = _chase([{**players[o], "pos": pos[o], "vel": (0.0, 0.0)} for o in opp_ids], end,
+                                       run_s + space_value.REACTION_S - ENGAGED_REACTION_S)
+            pos.update(chase)
+            pos[holder] = end
+            stopped = run["stopped_by"]
+            steps.append({"duration_s": _r(run_s), "label": f"#{holder} runs at goal", "_moved": [holder, *chase],
+                          **_snapshot(pos, end)})
+            text = (f"Then #{holder} runs about {metres:.0f} m into the gap"
+                    + (f" until #{stopped} closes him down." if stopped is not None else "."))
+    here = pos[holder]
+    opponents = [{**players[o], "pos": pos[o]} for o in opp_ids]
+    shot = geometry._shot({"pos": here}, opponents, sign)
+    xg = space_value.xg(shot["distance_m"], shot["angle_deg"], shot["lane_clear"])
+    chance = "less than 1%" if xg < 0.01 else f"about {round(xg * 100)}%"
+    out = distance(here, goal)
+    if out > SHOOT_RANGE_M:
+        # Too far to shoot: show the goal and the chance a shot would have, but the attack goes on with a pass.
+        aim = {"to": _units(goal), "chance": chance}
+        label = f"{out:.0f} m out · a shot now: {chance}"
+        if steps:
+            steps[-1].update(label=label, aim=aim)
+        else:
+            steps.append({"duration_s": 0.6, "label": label, "aim": aim, "_moved": [], **_snapshot(pos, here)})
+        return steps, (text + f" #{holder} is still {out:.0f} m from goal: a shot from there scores {chance} "
+                              f"of the time, so the attack goes on with the next pass.").strip()
+
+    # The shot: the keeper steps out on the line of the ball; the chance comes from the same xG model.
+    keeper = next((o for o in opp_ids if players[o]["role"] == "goalkeeper"), None)
+    moved = []
+    if keeper is not None:
+        pos[keeper] = (goal[0] + (here[0] - goal[0]) * KEEPER_OUT_M / out, goal[1] + (here[1] - goal[1]) * KEEPER_OUT_M / out)
+        moved.append(keeper)
+    blocked = "" if shot["lane_clear"] else " through a crowd of defenders"
+    steps.append({"duration_s": _r(max(0.6, distance(here, goal) / SHOT_SPEED_MPS)),
+                  "label": f"Shot · {chance} chance to score", "_moved": moved, **_snapshot(pos, goal)})
+    return steps, (text + f" #{holder} shoots from {distance(here, goal):.0f} m{blocked}: "
+                          f"a shot like that scores {chance} of the time.").strip()
 
 
 def _offside(me, target) -> dict:
@@ -99,7 +180,9 @@ def _pass(me, target, opponents) -> dict:
         outcome, tone, label = "completed", "good", f"#{target['id']} has time"
         text = f"#{target['id']} gets the ball with about {on_ball:.1f} s and room to turn before {who} arrives."
     return {"outcome": outcome, "tone": tone, "label": label, "text": text,
-            "duration_s": _r(max(0.6, travel)), "ball": b, "moves": moves}
+            "duration_s": _r(max(0.6, travel)), "ball": b, "moves": moves,
+            # Under heavy pressure the attack stops here; otherwise the receiver can run on.
+            "holder": None if outcome == "pressed" else target["id"]}
 
 
 def _dribble(me, opponents, sign) -> dict:
@@ -130,6 +213,7 @@ def _dribble(me, opponents, sign) -> dict:
         "outcome": "carried", "tone": "ok" if gap >= CLOSED_M else "risky", "label": "Carried into space",
         "text": f"You carry the ball about {carry:.0f} m into space; {who} {gap:.0f} m away when you stop.",
         "duration_s": _r(max(0.6, run_s)), "ball": end, "moves": moves,
+        "holder": me["id"] if gap >= CLOSED_M else None,
     }
 
 
@@ -158,6 +242,43 @@ def _shoot(me, opponents, sign) -> dict:
     return {"outcome": "on_goal", "tone": tone, "label": f"Shot: {chance}",
             "text": f"The shot goes towards goal: from {shot['distance_m']:.0f} m it scores {chance} of the time.",
             "duration_s": _r(max(0.6, distance(me["pos"], goal) / SHOT_SPEED_MPS)), "ball": goal, "moves": {}}
+
+
+def _best_run(here, goal, carry, opp_pos, opp_ids) -> dict:
+    """The run towards goal that gets furthest before a defender can close it down.
+
+    Directions within RUN_ANGLES_DEG of the line to goal are tried, metre by metre. The run stops a step
+    before a defender could arrive (closed down); it counts as a tackle only if a defender is clearly
+    there first, standing in the path from the start.
+    """
+    base = math.atan2(goal[1] - here[1], goal[0] - here[0])
+    best = None
+    for offset in RUN_ANGLES_DEG:
+        a = base + math.radians(offset)
+        ux, uy = math.cos(a), math.sin(a)
+        metres, stopped_by, tackled_by, end = 0, None, None, here
+        for step in range(1, int(carry) + 1):
+            point = (here[0] + ux * step, here[1] + uy * step)
+            if not (1 <= point[0] <= geometry.PITCH_LENGTH_M - 1 and 1 <= point[1] <= geometry.PITCH_WIDTH_M - 1):
+                break
+            mine = step / DRIBBLE_SPEED_MPS
+            who, t = min(((o, distance(p, point) / space_value.SPEED_MPS + ENGAGED_REACTION_S)
+                          for o, p in zip(opp_ids, opp_pos)), key=lambda x: x[1])
+            if t < mine - TACKLE_MARGIN_S and step == 1:
+                tackled_by = who
+                break
+            if t < mine + CLOSE_MARGIN_S:
+                stopped_by = who
+                break
+            metres, end = step, point
+        progress = distance(here, goal) - distance(end, goal)
+        candidate = {"end": end, "metres": metres, "stopped_by": stopped_by, "tackled_by": tackled_by,
+                     "score": progress - 0.2 * abs(offset) / 10}
+        if tackled_by is None and (best is None or candidate["score"] > best["score"]):
+            best = candidate
+    if best is None:  # every direction is blocked straight away
+        return candidate
+    return best
 
 
 def _chase(opponents, point, travel_s) -> tuple[dict, float, dict | None]:
