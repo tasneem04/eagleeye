@@ -62,8 +62,13 @@ const SITUATION_PRESETS = [
 async function init() {
   try {
     state.config = await api.getConfig();
-    el.badge.textContent = state.config.mode === 'foundry' ? 'Microsoft Foundry' : 'Mock mode';
+    const agents = state.config.stages.length;
+    el.badge.textContent = state.config.mode === 'foundry'
+      ? `Live · ${agents} Foundry agent${agents === 1 ? '' : 's'}`
+      : 'Offline mode';
+    el.badge.title = state.config.stages.map((s) => `${s.step}. ${s.agent}: ${s.title}`).join('\n');
     el.badge.className = `badge ${state.config.mode}`;
+    showStartHere();
     refreshKnowledge();
 
     const scenarios = await api.listScenarios();
@@ -154,12 +159,27 @@ async function select(player, frameIndex) {
   render();
 }
 
+// ---- first-visit guide ----------------------------------------------------
+
+const START_HERE_KEY = 'eagleeye.startHere.closed';
+
+function showStartHere() {
+  let closed = false;
+  try { closed = localStorage.getItem(START_HERE_KEY) === '1'; } catch { /* storage blocked: show it */ }
+  $('start-here').hidden = closed;
+}
+
+$('start-here-close').addEventListener('click', () => {
+  $('start-here').hidden = true;
+  try { localStorage.setItem(START_HERE_KEY, '1'); } catch { /* fine: it just shows again next visit */ }
+});
+
 // ---- coaching knowledge (changes only through approved KnowledgeScout research) ----
 
 async function refreshKnowledge() {
   try {
     const k = await api.getKnowledge();
-    el.knowledge.textContent = `Knowledge · reference v${k.reference_version}`;
+    el.knowledge.textContent = `Knowledge v${k.reference_version}`;
     el.knowledge.title = [
       'Coaching knowledge used by the agents (File Search).',
       `It changes only through ${k.changes_only_by}; nothing players do changes it.`,

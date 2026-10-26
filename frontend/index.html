@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>EagleEye</title>
   <meta name="description" content="EagleEye: an AI vision coach for footballers, built on synthetic data with fictional Blue and Red teams.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23f5c542' stroke-width='2'/%3E%3Ccircle cx='12' cy='12' r='4' fill='%23f5c542'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -41,6 +42,15 @@
 
   <main class="layout">
     <section class="stage">
+      <div id="start-here" class="start-here" hidden>
+        <ol>
+          <li><span class="num">1</span>Press play, then pause where you like</li>
+          <li><span class="num">2</span>Click a Blue player</li>
+          <li><span class="num">3</span>See the best move and where to look first</li>
+          <li><span class="num">4</span><span>Then <strong>Train</strong>: after 3 drills EagleEye learns how you scan</span></li>
+        </ol>
+        <button id="start-here-close" class="close" type="button" aria-label="Hide this guide">×</button>
+      </div>
       <p id="scenario-description" class="scenario-description"></p>
 
       <div class="pitch-wrap" id="pitch-wrap">

@@ -1,13 +1,16 @@
-// Side panel: selected player, what the geometry engine found, and each
-// Foundry agent's output in chain order.
+// Side panel: the answer first (the move, the coach's words, where to look), then
+// "See how the agents decided": what the geometry engine found and each Foundry
+// agent's output in chain order, one click away for anyone who wants the details.
+
+let howOpen = false; // keep the details open across re-renders once the player opened them
 
 export function renderPanel(panel, { config, scenario, selection }) {
   if (!selection) {
     panel.innerHTML = `
       <div class="card empty">
         <strong>Train your eagle eye</strong>
-        Press play to watch the move. Pause at any moment and click a player
-        to see the open teammates, triangles and space they should scan for.
+        Press play to watch the move. Pause at any moment and click a Blue player:
+        EagleEye shows the best move, why, and where to look first.
       </div>`;
     return;
   }
@@ -16,10 +19,65 @@ export function renderPanel(panel, { config, scenario, selection }) {
   const teamName = scenario.teams[player.team].name;
   panel.innerHTML = [
     playerCard(player, teamName, selection),
-    geometryCard(selection.geometry),
-    ...agentCards(config, selection),
+    answerCard(config, selection),
     selection.analysis ? clarityCard(selection.clarity) : '',
+    `<details class="how"${howOpen ? ' open' : ''}>
+      <summary>See how the agents decided</summary>
+      <div class="how-body">
+        ${geometryCard(selection.geometry)}
+        ${agentCards(config, selection).join('')}
+      </div>
+    </details>`,
   ].join('');
+  panel.querySelector('details.how')?.addEventListener('toggle', (e) => { howOpen = e.target.open; });
+}
+
+/** The short answer a player reads first: the move, the coach's explanation and where to look. */
+function answerCard(config, selection) {
+  const g = selection.geometry;
+  if (selection.error) return `<div class="card answer"><div class="warning">${esc(selection.error)}</div></div>`;
+  if (!config.stages.length) return '';
+  const analysis = selection.analysis;
+  if (!analysis) {
+    const agents = config.stages.length;
+    return `
+      <div class="card answer">
+        <div class="loading"><span class="spinner"></span>${agents} Microsoft Foundry agent${agents === 1 ? ' is' : 's are'} reading this moment…</div>
+        <div class="sub">The first look at a moment takes about 20 seconds. After that it is instant.</div>
+      </div>`;
+  }
+
+  const stages = Object.fromEntries(analysis.stages.map((s) => [s.key, s]));
+  const d = stages.decision?.data;
+  const coach = stages.coach?.output || d?.reason || '';
+  const advice = stages.tactical_context?.data?.position_advice || g?.space_value?.best_position?.direction_text;
+  let move;
+  if (offBall(g)) {
+    move = `<div class="answer-move">MOVE<span class="answer-target">${esc(advice || 'hold your position')}</span></div>
+       ${d ? `<div class="sub">If the ball comes to you: ${esc(moveText(d))}</div>` : ''}`;
+  } else if (g && !g.selected.has_ball) {
+    move = `<div class="sub">If the ball comes to you</div><div class="answer-move">${esc(moveText(d))}</div>`;
+  } else {
+    move = `<div class="answer-move">${esc(moveText(d))}</div>`;
+  }
+  const live = analysis.stages.every((s) => s.source === 'foundry');
+  const timing = analysis.cached ? 'instant (saved answer)' : `${(analysis.total_ms / 1000).toFixed(1)} s`;
+  return `
+    <div class="card answer">
+      <div class="answer-label">Best move</div>
+      ${move}
+      ${coach ? `<p class="answer-why">${esc(coach)}</p>` : ''}
+      ${d?.scan_cue ? `<p class="scan-cue"><span>Look first</span>${esc(d.scan_cue)}</p>` : ''}
+      <div class="agent-meta">
+        <span>${live ? `${analysis.stages.length} Microsoft Foundry agents` : 'Offline text (agents unavailable)'}</span>
+        <span>${timing}</span>
+      </div>
+    </div>`;
+}
+
+function moveText(d) {
+  if (!d) return '';
+  return d.action === 'pass' && d.target_player_id != null ? `PASS → #${d.target_player_id}` : d.action.toUpperCase();
 }
 
 /**
