@@ -129,7 +129,7 @@ def _geometry_facts(geometry: dict) -> dict:
         "open_teammates": geometry["open_teammates"],
         "passing_options": [
             {k: o[k] for k in ("id", "role", "distance_m", "forward_m", "receiver_space_m", "lane_open",
-                               "blocked_by", "open", "score", "space_value")}
+                               "blocked_by", "offside", "open", "score", "space_value")}
             for o in geometry["teammates"]
         ],
         "triangles": geometry["triangles"],

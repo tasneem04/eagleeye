@@ -48,3 +48,13 @@ def test_only_the_ball_carrier_and_teammates(make_client):
                                                        "player_id": 8, "choice": {"action": "shoot"}})
     assert ok.status_code == 200 and {"start", "end", "duration_s"} <= set(ok.json())
     assert off_ball.status_code == 422
+
+
+def test_pass_to_an_offside_player_shows_the_flag():
+    frame = {"time": 0, "ball": {"x": 40, "y": 50, "owner": 1}, "players": [
+        {"id": 1, "team": "home", "x": 40, "y": 50, "role": "cm"},
+        {"id": 9, "team": "home", "x": 80, "y": 50, "role": "st"},
+        {"id": 12, "team": "away", "x": 95, "y": 50, "role": "goalkeeper"},
+        {"id": 20, "team": "away", "x": 70, "y": 30, "role": "centre back"}]}
+    r = consequence.what_next(frame, 1, {"home": "right", "away": "left"}, {"action": "pass", "target_player_id": 9})
+    assert r["outcome"] == "offside" and "Offside" in r["label"]

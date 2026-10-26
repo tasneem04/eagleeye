@@ -285,7 +285,10 @@ def _facts(answer, verdict, scans, target_scans, missed, action, target, by_id, 
 
     if action == "pass" and target is not None:
         chosen = by_id.get(target)
-        if chosen and not chosen["lane_open"]:
+        if chosen and chosen.get("offside"):
+            facts.append(f"You chose to pass to #{target}, but #{target} was offside: beyond the last defender "
+                         f"when you passed, so the referee gives a free kick to the other team.")
+        elif chosen and not chosen["lane_open"]:
             facts.append(f"You chose to pass to #{target}, but #{', #'.join(map(str, chosen['blocked_by']))} blocked that lane.")
         elif chosen and not chosen["open"]:
             facts.append(f"You chose to pass to #{target}, who was tightly marked.")
@@ -406,19 +409,23 @@ def history_item(trial: dict, level: str, result: dict) -> dict:
 
 
 def demo_history(scenarios: dict, trials: list[dict], metas: list[dict], drills: int = 4) -> list[dict]:
-    """The labelled demo player: scans enough, but never checks over the right shoulder.
+    """The labelled demo player: scans enough, but never checks over one shoulder (the right, if enough
+    drills put the free player there).
 
     Built by grading scripted drills with the real grading code, so the sample is exactly what a
     player with that habit would produce, and "Your focus" appears without playing 3 drills first.
     """
     sides = {m["id"]: m["target_side"] for m in metas}
-    picks = [t for t in trials if t["kind"] == "drill" and sides.get(t["id"]) == "right"]
+    all_drills = [t for t in trials if t["kind"] == "drill"]
+    count = {s: sum(sides.get(t["id"]) == s for t in all_drills) for s in ("right", "left")}
+    side = "right" if count["right"] >= MIN_EVIDENCE or count["right"] >= count["left"] else "left"
+    picks = [t for t in all_drills if sides.get(t["id"]) == side]
     picks.sort(key=lambda t: (LEVEL_ORDER.index(t["level"]), t["id"]))  # easiest first
     history = []
     for trial in picks[:drills]:
         level = trial["level"]
         answer = answer_key(scenarios[trial["scenario_id"]], trial)
-        seen = [k["id"] for k in answer["key_players"] if k["side"] != "right"]
+        seen = [k["id"] for k in answer["key_players"] if k["side"] != side]
         mates = [k["id"] for k in answer["key_players"]
                  if k["team"] == trial["team"] and k["open"] and k["id"] in seen]
         choice = {"action": "pass", "target_player_id": mates[0]} if mates else {"action": "dribble"}

@@ -1,7 +1,7 @@
 {
   "id": "scan_drill_pro_05",
   "title": "Pro scan drill 5",
-  "description": "Rondo-style drill. #6 plays the ball to #8. Scan before it arrives and find the free player.",
+  "description": "Small-sided drill against a keeper and a back line. #6 plays the ball to #8. Scan before it arrives and find the free player.",
   "synthetic": true,
   "teams": {
     "home": {
@@ -89,24 +89,52 @@
           "role": "striker"
         },
         {
-          "id": 17,
+          "id": 12,
           "team": "away",
-          "x": 68.8,
-          "y": 53.8,
+          "x": 94.4,
+          "y": 52.3,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 20,
+          "team": "away",
+          "x": 66.8,
+          "y": 56.0,
           "role": "centre back"
+        },
+        {
+          "id": 21,
+          "team": "away",
+          "x": 67.9,
+          "y": 33.2,
+          "role": "centre back"
+        },
+        {
+          "id": 22,
+          "team": "away",
+          "x": 67.4,
+          "y": 15.5,
+          "role": "full back"
+        },
+        {
+          "id": 23,
+          "team": "away",
+          "x": 68.7,
+          "y": 83.5,
+          "role": "full back"
         },
         {
           "id": 18,
           "team": "away",
-          "x": 57.8,
-          "y": 75.8,
+          "x": 58.8,
+          "y": 75.5,
           "role": "wide midfielder"
         },
         {
           "id": 19,
           "team": "away",
-          "x": 56.9,
-          "y": 35.6,
+          "x": 65.2,
+          "y": 42.5,
           "role": "defensive midfielder"
         }
       ]
@@ -176,24 +204,52 @@
           "role": "striker"
         },
         {
-          "id": 17,
+          "id": 12,
           "team": "away",
-          "x": 68.8,
-          "y": 53.8,
+          "x": 94.4,
+          "y": 52.3,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 20,
+          "team": "away",
+          "x": 66.8,
+          "y": 56.0,
           "role": "centre back"
+        },
+        {
+          "id": 21,
+          "team": "away",
+          "x": 67.9,
+          "y": 33.2,
+          "role": "centre back"
+        },
+        {
+          "id": 22,
+          "team": "away",
+          "x": 67.4,
+          "y": 15.5,
+          "role": "full back"
+        },
+        {
+          "id": 23,
+          "team": "away",
+          "x": 68.7,
+          "y": 83.5,
+          "role": "full back"
         },
         {
           "id": 18,
           "team": "away",
-          "x": 57.8,
-          "y": 75.8,
+          "x": 58.8,
+          "y": 75.5,
           "role": "wide midfielder"
         },
         {
           "id": 19,
           "team": "away",
-          "x": 56.9,
-          "y": 35.6,
+          "x": 65.2,
+          "y": 42.5,
           "role": "defensive midfielder"
         }
       ]
@@ -263,24 +319,52 @@
           "role": "striker"
         },
         {
-          "id": 17,
+          "id": 12,
           "team": "away",
-          "x": 68.8,
-          "y": 53.8,
+          "x": 94.4,
+          "y": 52.3,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 20,
+          "team": "away",
+          "x": 66.8,
+          "y": 56.0,
           "role": "centre back"
+        },
+        {
+          "id": 21,
+          "team": "away",
+          "x": 67.9,
+          "y": 33.2,
+          "role": "centre back"
+        },
+        {
+          "id": 22,
+          "team": "away",
+          "x": 67.4,
+          "y": 15.5,
+          "role": "full back"
+        },
+        {
+          "id": 23,
+          "team": "away",
+          "x": 68.7,
+          "y": 83.5,
+          "role": "full back"
         },
         {
           "id": 18,
           "team": "away",
-          "x": 57.8,
-          "y": 75.8,
+          "x": 58.8,
+          "y": 75.5,
           "role": "wide midfielder"
         },
         {
           "id": 19,
           "team": "away",
-          "x": 56.9,
-          "y": 35.6,
+          "x": 65.2,
+          "y": 42.5,
           "role": "defensive midfielder"
         }
       ]
@@ -350,24 +434,52 @@
           "role": "striker"
         },
         {
-          "id": 17,
+          "id": 12,
           "team": "away",
-          "x": 68.8,
-          "y": 53.8,
+          "x": 94.4,
+          "y": 52.3,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 20,
+          "team": "away",
+          "x": 66.8,
+          "y": 56.0,
           "role": "centre back"
+        },
+        {
+          "id": 21,
+          "team": "away",
+          "x": 67.9,
+          "y": 33.2,
+          "role": "centre back"
+        },
+        {
+          "id": 22,
+          "team": "away",
+          "x": 67.4,
+          "y": 15.5,
+          "role": "full back"
+        },
+        {
+          "id": 23,
+          "team": "away",
+          "x": 68.7,
+          "y": 83.5,
+          "role": "full back"
         },
         {
           "id": 18,
           "team": "away",
-          "x": 57.8,
-          "y": 75.8,
+          "x": 58.8,
+          "y": 75.5,
           "role": "wide midfielder"
         },
         {
           "id": 19,
           "team": "away",
-          "x": 56.9,
-          "y": 35.6,
+          "x": 65.2,
+          "y": 42.5,
           "role": "defensive midfielder"
         }
       ]

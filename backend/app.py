@@ -41,6 +41,7 @@ KNOWLEDGE_DIR = ROOT / "knowledge"
 CLARITY_PATH = ROOT / "data" / "feedback" / "clarity.jsonl"
 CACHE_PATH = ROOT / "data" / "cache" / "analysis.json"
 ANALYSIS_CACHE_SIZE = 200
+ENGINE_VERSION = 2  # bump when the geometry facts change (2: offside), so saved agent answers are rebuilt
 # Warmed at startup so a judge's first clicks are instant: the key moment's ball carrier and two
 # open teammates, in the scenario's situation and the selector's presets (frontend/js/main.js).
 WARMUP_SITUATIONS = [None, {"minute": 88, "score": {"home": 1, "away": 0}},
@@ -125,7 +126,8 @@ def _scout_timer(scout: KnowledgeScout, hours: float, stop: threading.Event) -> 
 
 
 def _cache_tag(app: FastAPI) -> str:
-    return knowledge_tag(KNOWLEDGE_DIR, [f"{s.key}={s.agent_name}" for s in app.state.pipeline.stages])
+    chain = [f"engine={ENGINE_VERSION}", *(f"{s.key}={s.agent_name}" for s in app.state.pipeline.stages)]
+    return knowledge_tag(KNOWLEDGE_DIR, chain)
 
 
 def _warm_up(app: FastAPI, stop: threading.Event) -> None:

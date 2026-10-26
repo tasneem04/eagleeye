@@ -1,7 +1,7 @@
 {
   "id": "scan_drill_rookie_02",
   "title": "Rookie scan drill 2",
-  "description": "Rondo-style drill. #6 plays the ball to #8. Scan before it arrives and find the free player.",
+  "description": "Small-sided drill against a keeper and a back line. #6 plays the ball to #8. Scan before it arrives and find the free player.",
   "synthetic": true,
   "teams": {
     "home": {
@@ -87,6 +87,20 @@
           "x": 43.3,
           "y": 47.9,
           "role": "striker"
+        },
+        {
+          "id": 12,
+          "team": "away",
+          "x": 94.8,
+          "y": 53.5,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 20,
+          "team": "away",
+          "x": 63.9,
+          "y": 39.9,
+          "role": "centre back"
         }
       ]
     },
@@ -153,6 +167,20 @@
           "x": 44.3,
           "y": 47.7,
           "role": "striker"
+        },
+        {
+          "id": 12,
+          "team": "away",
+          "x": 94.8,
+          "y": 53.5,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 20,
+          "team": "away",
+          "x": 63.9,
+          "y": 39.9,
+          "role": "centre back"
         }
       ]
     },
@@ -219,6 +247,20 @@
           "x": 45.4,
           "y": 47.6,
           "role": "striker"
+        },
+        {
+          "id": 12,
+          "team": "away",
+          "x": 94.8,
+          "y": 53.5,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 20,
+          "team": "away",
+          "x": 63.9,
+          "y": 39.9,
+          "role": "centre back"
         }
       ]
     },
@@ -285,6 +327,20 @@
           "x": 46.2,
           "y": 47.5,
           "role": "striker"
+        },
+        {
+          "id": 12,
+          "team": "away",
+          "x": 94.8,
+          "y": 53.5,
+          "role": "goalkeeper"
+        },
+        {
+          "id": 20,
+          "team": "away",
+          "x": 63.9,
+          "y": 39.9,
+          "role": "centre back"
         }
       ]
     }

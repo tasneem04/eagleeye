@@ -138,12 +138,16 @@ def build_scenario(spec, base):
 # ---- scan drills --------------------------------------------------------------
 
 # What changes between levels is the game, not the human: how close the press is and how many
-# opponents crowd the picture. Pro adds a defender shadowing the free player.
+# opponents crowd the picture. Pro adds a defender shadowing the free player. Every drill has a Red
+# keeper and a back line behind the free player, so he is onside (Law 11) as in a real match:
+# Rookie keeper + 1 centre back, Academy keeper + 2 centre backs, Pro keeper + a back four.
 DRILL_LEVELS = {
-    "rookie": {"count": 5, "presser_m": (7.0, 10.0), "cover": False, "screen": False, "shadow": False},
-    "academy": {"count": 5, "presser_m": (4.5, 7.0), "cover": True, "screen": True, "shadow": False},
-    "pro": {"count": 5, "presser_m": (3.5, 5.0), "cover": True, "screen": True, "shadow": True},
+    "rookie": {"count": 5, "presser_m": (7.0, 10.0), "screen": False, "shadow": False, "backline": ("cb",)},
+    "academy": {"count": 5, "presser_m": (4.5, 7.0), "screen": True, "shadow": False, "backline": ("cb", "cb")},
+    "pro": {"count": 5, "presser_m": (3.5, 5.0), "screen": True, "shadow": True,
+            "backline": ("cb", "cb", "fb", "fb")},
 }
+KEEPER, BACKLINE_IDS = 12, (20, 21, 22, 23)
 OUTSIDE_VIEW_DEG = 100   # the free teammate must be at least this far from where the receiver faces...
 REACHABLE_DEG = 145      # ...but still within a realistic head turn (120° gaze + 30° picked-out field, minus margin)
 RECEIVER, PASSER, TARGET, DECOY_A, DECOY_B = 8, 6, 10, 4, 11
@@ -198,8 +202,8 @@ def _drill_candidate(rng, profile):
         15: ("away", "central midfielder", *marker_b),
         16: ("away", "striker", *presser),
     }
-    if profile["cover"]:
-        base[17] = ("away", "centre back", *_offset(target, rng.uniform(9, 14), rng.uniform(-60, 60)))
+    base[KEEPER] = ("away", "goalkeeper", rng.uniform(93.5, 95.5), rng.uniform(46, 54))  # a few metres off his line
+    base.update(_backline(rng, target, profile["backline"]))
     if profile["screen"]:
         base[18] = ("away", "wide midfielder",
                     *_offset(receiver, rng.uniform(8, 12), rng.uniform(60, 90) * rng.choice([-1, 1])))
@@ -221,6 +225,25 @@ def _drill_candidate(rng, profile):
     return base, keyframes
 
 
+def _backline(rng, target, shape) -> dict:
+    """Red's back line, 5-12 m deeper than the free player (so he is onside), centre backs either side
+    of him and full backs wide."""
+    tx, ty = _metres(*target)
+    depth = min(tx + rng.uniform(5, 12), 98.0)
+    line = {}
+    cb_sides = [-1, 1] if shape.count("cb") > 1 else [rng.choice([-1, 1])]
+    for i, kind in enumerate(shape):
+        if kind == "cb":
+            y = ty + cb_sides.pop() * rng.uniform(6, 12)
+            role = "centre back"
+        else:
+            y = 9.0 if not any(r == "full back" and yy < 34 for r, yy in line.values()) else 59.0
+            y += rng.uniform(-3, 3)
+            role = "full back"
+        line[BACKLINE_IDS[i]] = (role, min(max(y, 3.0), 65.0))
+    return {pid: ("away", role, *_units(depth + rng.uniform(-1.5, 1.5), y)) for pid, (role, y) in line.items()}
+
+
 def _drill_ok(scenario) -> bool:
     from backend import training
 
@@ -230,6 +253,9 @@ def _drill_ok(scenario) -> bool:
     answer = training.answer_key(scenario, trials[0])
     best = answer["best"]
     if best["action"] != "pass" or best["target_player_id"] != TARGET:
+        return False
+    by_id = {o["id"]: o for o in answer["geometry"]["teammates"]}
+    if by_id[TARGET]["offside"]:  # the free player must be free because of space, not because he's offside
         return False
     frame = scenario["frames"][-1]
     pos = {p["id"]: _metres(p["x"], p["y"]) for p in frame["players"]}
@@ -249,7 +275,8 @@ def scan_drill(level: str, n: int, seed: int) -> dict:
         scenario = build_scenario({
             "id": f"scan_drill_{level}_{n:02d}",
             "title": f"{level.capitalize()} scan drill {n}",
-            "description": "Rondo-style drill. #6 plays the ball to #8. Scan before it arrives and find the free player.",
+            "description": "Small-sided drill against a keeper and a back line. #6 plays the ball to #8. "
+                           "Scan before it arrives and find the free player.",
             "key_frame": len(keyframes) - 1,
             "match_situation": {"minute": 50, "score": {"home": 0, "away": 0}},
             "keyframes": keyframes,

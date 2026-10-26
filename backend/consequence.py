@@ -41,7 +41,11 @@ def what_next(frame: dict, player_id: int, attacking_direction: dict, choice: di
         target = players.get(choice.get("target_player_id"))
         if target is None or target["team"] != me["team"] or target["id"] == me["id"]:
             raise ValueError("a pass needs a teammate to pass to")
-        result = _pass(me, target, opponents)
+        line = geometry.offside_line(opponents, sign)
+        if geometry.is_offside(target["pos"], me["pos"], line, sign):
+            result = _offside(me, target)
+        else:
+            result = _pass(me, target, opponents)
     elif action == "dribble":
         result = _dribble(me, opponents, sign)
     elif action == "shoot":
@@ -54,6 +58,16 @@ def what_next(frame: dict, player_id: int, attacking_direction: dict, choice: di
     end = {"ball": _units(ball_end), "players": [
         {"id": p["id"], **_units(moves.get(p["id"], p["pos"]))} for p in players.values()]}
     return {**result, "start": start, "end": end, "moved": sorted(moves), "caption": CAPTION}
+
+
+def _offside(me, target) -> dict:
+    return {
+        "outcome": "offside", "tone": "risky", "label": f"Offside: #{target['id']}",
+        "text": f"Flag up: #{target['id']} was beyond the last defender when you passed. "
+                f"Offside, so the other team gets a free kick.",
+        "duration_s": _r(max(0.6, distance(me["pos"], target["pos"]) / PASS_SPEED_MPS)),
+        "ball": target["pos"], "moves": {},
+    }
 
 
 def _pass(me, target, opponents) -> dict:

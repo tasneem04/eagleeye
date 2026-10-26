@@ -42,14 +42,23 @@ def drill(name="scan_drill_academy_01"):
 
 
 def test_levels_change_the_game_not_the_human():
-    for level, players, press_range in [("rookie", 8, (4, 99)), ("academy", 10, (2, 4)), ("pro", 11, (1.3, 2.2))]:
+    # 5 Blue v keeper + back line (+ the press): rookie 5 v 5, academy 5 v 7, pro 5 v 10 with a back four.
+    levels = [("rookie", 10, 1, (4, 99)), ("academy", 12, 2, (2, 4)), ("pro", 15, 4, (1.3, 2.2))]
+    for level, players, backs, press_range in levels:
         for path in sorted(SCENARIOS.glob(f"scan_drill_{level}_*.json")):
             scenario = json.loads(path.read_text(encoding="utf-8"))
             assert scenario["level"] == level
-            assert len(scenario["frames"][0]["players"]) == players
+            frame = scenario["frames"][0]
+            assert len(frame["players"]) == players
+            roles = [p["role"] for p in frame["players"] if p["team"] == "away"]
+            assert roles.count("goalkeeper") == 1, path.name
+            assert roles.count("centre back") + roles.count("full back") == backs, path.name
             answer = training.answer_key(scenario, training.find_trials(scenario)[0])
             press = answer["geometry"]["pressure"]["nearest_opponents"][0]["distance_m"]
             assert press_range[0] <= press <= press_range[1], path.name
+            # The free player is free because of space, never because he is offside (Law 11).
+            best = answer["best"]["target_player_id"]
+            assert not next(o for o in answer["geometry"]["teammates"] if o["id"] == best)["offside"], path.name
 
 
 def test_scan_targets_follow_research_rates():
@@ -183,3 +192,17 @@ def test_debrief_never_calls_the_scanning_great_unless_code_says_so():
     facts = ["You scanned 2 times before the ball arrived (target: 1)."]
     assert pipeline.debrief(facts, "rookie", "further")["output"] == "Good job scanning twice! You did a good job."
     assert pipeline.debrief(facts, "rookie", "great")["output"].startswith("Great job")
+
+
+def test_a_pass_to_an_offside_player_is_risky_and_explained():
+    scenario = json.loads((SCENARIOS / "scan_drill_rookie_02.json").read_text(encoding="utf-8"))
+    trial = training.find_trials(scenario)[0]
+    frame = scenario["frames"][trial["arrival_frame"]]
+    deepest = max(p["x"] for p in frame["players"] if p["team"] == "away" and p["role"] != "goalkeeper")
+    decoy = next(p for p in frame["players"] if p["id"] == 11)
+    decoy["x"], decoy["y"] = min(deepest + 4, 92), 50  # beyond the back line, in Red's half
+    answer = training.answer_key(scenario, trial)
+    result = training.grade(answer, "rookie", 1, [10, 11], {"action": "pass", "target_player_id": 11},
+                            window_s=trial["window_s"])
+    assert result["verdict"] == "risky"
+    assert any("offside" in f for f in result["facts"])

@@ -158,7 +158,7 @@ function optionFacts(choice, g) {
     if (!t) return rows('—', '—', '—', '—');
     const space = Math.round(t.receiver_space_m);
     return rows(
-      t.lane_open ? 'lane open' : `blocked by #${t.blocked_by.join(', #')}`,
+      t.offside ? 'OFFSIDE' : t.lane_open ? 'lane open' : `blocked by #${t.blocked_by.join(', #')}`,
       `${space} m to the nearest defender${t.receiver_space_m < 4 ? ' (marked)' : ''}`,
       t.forward_m >= 0 ? `${Math.round(t.forward_m)} m forward` : `${Math.round(-t.forward_m)} m back`,
       `${Math.round(t.distance_m)} m pass`,
@@ -200,6 +200,9 @@ export function callVerdict(choice, g, d, mode) {
   if (choice.action === 'pass') {
     const t = byId[choice.target_player_id];
     if (!t) return { tone: 'risky', text: `#${choice.target_player_id} is not a passing option from here.` };
+    if (t.offside) {
+      return { tone: 'risky', text: `#${t.id} is offside: in their half, ahead of the ball and beyond the last defender when you pass. The flag goes up and the other team gets a free kick.${bestLine}${waiting}` };
+    }
     if (!t.lane_open) {
       return { tone: 'risky', text: `the lane to #${t.id} is blocked by #${t.blocked_by.join(' and #')}, so the pass is likely to be cut out.${bestLine}${waiting}` };
     }

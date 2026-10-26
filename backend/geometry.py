@@ -70,6 +70,19 @@ def lane_blockers(a, b, opponents, width=None) -> list[int]:
     return blockers
 
 
+def offside_line(opponents, sign) -> float:
+    """Depth (metres, measured in the attacking direction) of the second-last opponent; the keeper counts."""
+    depths = sorted((sign * o["pos"][0] for o in opponents), reverse=True)
+    return depths[1] if len(depths) > 1 else -math.inf
+
+
+def is_offside(pos, ball_pos, line, sign) -> bool:
+    """Law 11 at the moment of the pass: in the opponents' half, ahead of the ball and beyond the
+    second-last opponent. Level counts as onside."""
+    depth = sign * pos[0]
+    return depth > sign * PITCH_LENGTH_M / 2 and depth > sign * ball_pos[0] and depth > line
+
+
 def triangle_area(a, b, c) -> float:
     return abs((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])) / 2
 
@@ -90,8 +103,11 @@ def analyze(frame: dict, player_id: int, attacking_direction: dict, prev_frame: 
     sign = 1 if attacking == "right" else -1
     teammates = [p for p in players.values() if p["team"] == me["team"] and p["id"] != player_id]
     opponents = [p for p in players.values() if p["team"] != me["team"]]
+    ball_pos = _ball_pos(frame, players)
+    line = offside_line(opponents, sign)
+    offside = {p["id"] for p in teammates if is_offside(p["pos"], ball_pos, line, sign)}
 
-    passing = _passing_options(me, teammates, opponents, sign)
+    passing = _passing_options(me, teammates, opponents, sign, offside)
     team_movers = {p["id"]: space_value.mover(p["pos"], p["vel"]) for p in [me, *teammates]}
     opp_movers = [space_value.mover(o["pos"], o["vel"]) for o in opponents]
     for option in passing["teammates"]:
@@ -113,6 +129,13 @@ def analyze(frame: dict, player_id: int, attacking_direction: dict, prev_frame: 
         "shot": shot,
         "space_value": _space_value(frame, players, me, team_movers, opp_movers, opponents, sign, attacking),
     }
+
+
+def _ball_pos(frame, players):
+    owner = frame["ball"].get("owner")
+    if owner is not None and owner in players:
+        return players[owner]["pos"]
+    return to_metres(frame["ball"]["x"], frame["ball"]["y"])
 
 
 def _add_velocities(players, frame, prev_frame) -> None:
@@ -146,9 +169,12 @@ def _space_value(frame, players, me, team_movers, opp_movers, opponents, sign, a
         return result
 
     origin = players[owner]["pos"] if owner is not None else to_metres(frame["ball"]["x"], frame["ball"]["y"])
+    line = offside_line(opponents, sign)
 
     def lane_ok(point):
-        return distance(origin, point) <= MAX_PASS_M and not lane_blockers(origin, point, opponents)
+        # A run is only worth making to a spot the ball can reach and where you'd be onside.
+        return (distance(origin, point) <= MAX_PASS_M and not lane_blockers(origin, point, opponents)
+                and not is_offside(point, origin, line, sign))
 
     best = space_value.best_position(team_movers[me["id"]], team, opp_movers, sign, lane_ok)
     if best is None:
@@ -193,7 +219,7 @@ def _pressure(me, opponents) -> dict:
     }
 
 
-def _passing_options(me, teammates, opponents, sign) -> dict:
+def _passing_options(me, teammates, opponents, sign, offside=frozenset()) -> dict:
     options = []
     for mate in teammates:
         length = distance(me["pos"], mate["pos"])
@@ -210,7 +236,9 @@ def _passing_options(me, teammates, opponents, sign) -> dict:
             "receiver_space_m": _r(space),
             "lane_open": not blockers,
             "blocked_by": blockers,
-            "open": not blockers and space >= RECEIVER_SPACE_M,
+            "offside": mate["id"] in offside,
+            # Free means: the lane is clear, they have room, and they're onside.
+            "open": not blockers and space >= RECEIVER_SPACE_M and mate["id"] not in offside,
             # Favour forward progress and a receiver with room; long passes cost a little.
             "score": _r(0.6 * forward + 0.8 * min(space, 12.0) - 0.15 * max(0.0, length - 25.0)),
         })
@@ -238,7 +266,8 @@ def _passing_options(me, teammates, opponents, sign) -> dict:
     links = [o for o in open_options if o["role"] != "goalkeeper"]
     third_man = {}
     for target in options:
-        if target["lane_open"] or target["forward_m"] <= 0 or target["receiver_space_m"] < RECEIVER_SPACE_M:
+        if (target["lane_open"] or target["forward_m"] <= 0 or target["receiver_space_m"] < RECEIVER_SPACE_M
+                or target["offside"]):
             continue
         if target["role"] == "goalkeeper":
             continue

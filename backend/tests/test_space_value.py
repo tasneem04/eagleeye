@@ -48,11 +48,32 @@ def test_blocked_runner_moves_to_a_spot_the_ball_can_reach():
     m_ = moment([
         (1, "home", 40, 50, "cm"), (2, "home", 60, 50, "st"),
         (12, "away", 50, 50, "cm"), (13, "away", 90, 50, "goalkeeper"),
+        (14, "away", 75, 20, "cb"),  # a back line, so the striker is onside
     ], owner=1)
     best = analyze(m_, 2, DIRECTIONS)["space_value"]["best_position"]
     assert best is not None
     assert best["available_here"] is False
     assert abs(best["y"] - 50) > 3  # stepped out of the blocked line
+
+
+def test_offside_teammates_are_never_open_and_runs_stay_onside():
+    m_ = moment([
+        (1, "home", 40, 50, "cm"), (2, "home", 75, 50, "st"), (3, "home", 60, 20, "wing"),
+        (12, "away", 45, 70, "cm"), (13, "away", 95, 50, "goalkeeper"), (14, "away", 65, 30, "cb"),
+    ], owner=1)
+    geo = analyze(m_, 1, DIRECTIONS)
+    by_id = {o["id"]: o for o in geo["teammates"]}
+    assert by_id[2]["offside"] and not by_id[2]["open"]          # beyond the second-last defender (#14)
+    assert not by_id[3]["offside"]                               # behind #14: onside
+    assert 2 not in geo["open_teammates"]
+    level = moment([(1, "home", 40, 50, "cm"), (2, "home", 65, 50, "st"),
+                    (13, "away", 95, 50, "goalkeeper"), (14, "away", 65, 30, "cb")], owner=1)
+    assert not {o["id"]: o for o in analyze(level, 1, DIRECTIONS)["teammates"]}[2]["offside"]  # level is onside
+    own_half = moment([(1, "home", 20, 50, "cm"), (2, "home", 45, 50, "st"),
+                       (13, "away", 95, 50, "goalkeeper")], owner=1)
+    assert not {o["id"]: o for o in analyze(own_half, 1, DIRECTIONS)["teammates"]}[2]["offside"]  # own half
+    run = analyze(m_, 2, DIRECTIONS)["space_value"]["best_position"]
+    assert run is None or run["x"] * 1.05 <= 65 * 1.05 + 0.01      # a run never ends offside
 
 
 def test_no_best_position_on_the_ball_or_when_defending():
