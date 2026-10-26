@@ -25,7 +25,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import geometry, training
+from . import consequence, geometry, training
 from .agents.pipeline import Pipeline
 from .analysis_cache import AnalysisCache, knowledge_tag
 from .learning.clarity import MAX_COMMENT_CHARS, MAX_EXPLANATION_CHARS, ClarityStore
@@ -439,6 +439,24 @@ class Choice(BaseModel):
     target_player_id: int | None = None   # pass receiver, or the teammate a dribble heads towards
     target_x: float | None = Field(default=None, ge=0, le=100)  # dribble destination, scenario units
     target_y: float | None = Field(default=None, ge=0, le=100)
+
+
+class WhatNextRequest(MomentRequest):
+    choice: Choice
+
+
+@app.post("/api/what-next")
+def what_next(body: WhatNextRequest, request: Request):
+    """A short replay of one choice by the player on the ball, worked out in code (no agent call)."""
+    scenario, frame = _resolve(request, body)
+    if frame["ball"]["owner"] != body.player_id:
+        raise HTTPException(422, "Only the player on the ball can make this choice")
+    prev = scenario["frames"][body.frame_index - 1] if body.frame_index > 0 else None
+    try:
+        return consequence.what_next(frame, body.player_id, scenario["attacking_direction"],
+                                     body.choice.model_dump(), prev)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
 
 
 class TrainingSubmission(BaseModel):

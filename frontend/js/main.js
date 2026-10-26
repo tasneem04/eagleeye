@@ -242,6 +242,18 @@ function onCall(action) {
     clearSelection();
     return;
   }
+  if (action === 'replay-mine' && sel.call.choice) return void playReplay(sel.call.choice, 'yours');
+  if (action === 'replay-best') {
+    const d = sel.analysis?.stages.find((s) => s.key === 'decision')?.data;
+    if (d) playReplay({ action: d.action, target_player_id: d.target_player_id }, 'best');
+    return;
+  }
+  if (action === 'replay-off') {
+    sel.replay = null;
+    render();
+    return;
+  }
+  sel.replay = null;
   if (action === 'skip') sel.call = { asking: false, revealed: true, choice: null };
   else if (action === 'again') sel.call = { asking: true, revealed: true, choice: null };
   else makeChoice({ action });
@@ -252,6 +264,61 @@ function makeChoice(choice) {
   const sel = state.selection;
   sel.call = { asking: false, revealed: true, choice };
   render();
+  playReplay(choice, 'yours');
+}
+
+// ---- "What happens next": a short replay of a choice, worked out in code (no agent call) ----
+
+async function playReplay(choice, who) {
+  const sel = state.selection;
+  if (!sel) return;
+  const requestId = state.requestId;
+  sel.replay = { who, choice, loading: true };
+  render();
+  try {
+    const data = await api.whatNext({ scenario_id: state.scenario.id, frame_index: sel.frameIndex, player_id: sel.player.id }, choice);
+    if (requestId !== state.requestId || sel.replay?.choice !== choice) return;
+    sel.replay = { who, choice, data, t0: performance.now() };
+  } catch (err) {
+    if (sel.replay?.choice === choice) sel.replay = { who, choice, error: err.message };
+  }
+  render();
+}
+
+/** Players and ball at this instant of the replay (positions eased from start to end). */
+function replayPositions(replay, players, now) {
+  const { data } = replay;
+  const k = Math.min(1, (now - replay.t0) / 1000 / data.duration_s);
+  const e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2; // ease in-out
+  const start = new Map(data.start.players.map((p) => [p.id, p]));
+  const end = new Map(data.end.players.map((p) => [p.id, p]));
+  const lerp = (a, b) => ({ x: a.x + (b.x - a.x) * e, y: a.y + (b.y - a.y) * e });
+  return {
+    done: k >= 1,
+    players: players.map((p) => (start.has(p.id) ? { ...p, ...lerp(start.get(p.id), end.get(p.id)) } : p)),
+    ball: { ...lerp(data.start.ball, data.end.ball), owner: null },
+  };
+}
+
+function drawReplayLabel(replay) {
+  const { ctx } = view;
+  const { ball } = replay.data.end;
+  const [x, y] = view.toPx(ball.x, ball.y);
+  const text = replay.data.label;
+  ctx.save();
+  ctx.font = '700 13px Inter, system-ui, sans-serif';
+  const w = ctx.measureText(text).width + 16;
+  const colour = { good: COLORS.open, ok: '#f5c542', risky: '#ef4444' }[replay.data.tone] ?? '#f5c542';
+  ctx.fillStyle = 'rgba(10, 15, 26, 0.88)';
+  ctx.strokeStyle = colour;
+  ctx.lineWidth = 2;
+  ctx.fillRect(x - w / 2, y - view.playerRadius - 34, w, 24);
+  ctx.strokeRect(x - w / 2, y - view.playerRadius - 34, w, 24);
+  ctx.fillStyle = colour;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, x, y - view.playerRadius - 22);
+  ctx.restore();
 }
 
 function clearSelection() {
@@ -311,6 +378,14 @@ function draw(now) {
   view.drawPitch();
   view.drawSides(analyseSides());
   const sel = state.selection;
+  if (sel?.replay?.data) {
+    // "What happens next": the replay replaces the frozen moment until "Back to the moment".
+    const r = replayPositions(sel.replay, players, now);
+    view.drawPlayers(r.players, { selectedId: sel.player.id });
+    view.drawBall(r.ball);
+    if (r.done) drawReplayLabel(sel.replay);
+    return;
+  }
   let focusIds = null;
   const hideAnswer = sel?.call && !sel.call.revealed; // no lanes or arrows until the player has chosen
   if (sel?.geometry && !hideAnswer) {

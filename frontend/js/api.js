@@ -47,6 +47,7 @@ export const getScenario = (id) => request(`/api/scenarios/${encodeURIComponent(
 const post = (path, body) => request(path, { method: 'POST', body: JSON.stringify(body) });
 export const getGeometry = ({ situation, ...moment }) => post('/api/geometry', moment);
 export const analyze = (moment) => post('/api/analyze', moment);
+export const whatNext = ({ situation, ...moment }, choice) => post('/api/what-next', { ...moment, choice });
 export const getKnowledge = () => request('/api/knowledge');
 export const getTrials = () => request('/api/training/trials');
 export const evaluateTraining = (body) => post('/api/training/evaluate', body);

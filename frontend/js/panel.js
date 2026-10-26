@@ -120,11 +120,32 @@ function verdictCard(choice, selection) {
         <tbody>${rows}</tbody>
       </table>
       <p class="verdict-text"><strong>Why:</strong> ${esc(v.text)}</p>
+      ${replayBox(selection.replay, Boolean(d))}
       <div class="call-buttons">
         <button class="choice-btn" data-call="again">Try another option</button>
         <button class="link-btn" data-call="other">Look at another player</button>
       </div>
       <p class="sub">Tip: click any other teammate on the pitch to try that pass.</p>
+    </div>`;
+}
+
+/** "What happens next": the outcome of the replay on the pitch, and buttons to watch yours or the best. */
+function replayBox(replay, haveBest) {
+  let body = '';
+  if (replay?.loading) body = '<div class="loading"><span class="spinner"></span>Playing it out…</div>';
+  else if (replay?.error) body = `<div class="warning">${esc(replay.error)}</div>`;
+  else if (replay?.data) body = `<p class="replay-text tone-${esc(replay.data.tone)}">${esc(replay.data.text)}</p>`;
+  const whose = replay?.who === 'best' ? 'the best option' : 'your choice';
+  return `
+    <div class="replay">
+      <div class="answer-label">What happens next${replay ? ` · ${whose}` : ''}</div>
+      ${body}
+      <div class="call-buttons">
+        <button class="choice-btn" data-call="replay-mine">▶ Your choice</button>
+        ${haveBest ? '<button class="choice-btn" data-call="replay-best">▶ The best option</button>' : ''}
+        ${replay?.data ? '<button class="link-btn" data-call="replay-off">Back to the moment</button>' : ''}
+      </div>
+      ${replay?.data ? `<p class="sub">${esc(replay.data.caption)}</p>` : ''}
     </div>`;
 }
 

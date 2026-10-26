@@ -353,6 +353,11 @@ table.compare strong { display: block; font-size: 18px; margin-top: 2px; }
 table.compare .you { color: #ffffff; }
 table.compare .agents { color: var(--accent); }
 .verdict-text { margin: 0 0 12px; font-size: 15px; line-height: 1.5; }
+.replay { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); }
+.replay .call-buttons { margin-top: 8px; }
+.replay-text { margin: 6px 0 0; font-size: 15px; line-height: 1.45; padding-left: 10px; border-left: 3px solid var(--accent); }
+.replay-text.tone-good { border-left-color: var(--open); }
+.replay-text.tone-risky { border-left-color: var(--blocked); }
 
 /* First-visit guide above the pitch */
 .start-here {
