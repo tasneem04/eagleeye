@@ -1,6 +1,7 @@
 import * as api from './api.js';
 import { drawDecision, drawOverlays, isOffBall } from './overlays.js';
-import { explanationText, renderPanel } from './panel.js';
+import { loadDone, markDone, momentsHtml, momentTitle, nextMoment } from './moments.js';
+import { agentInitials, explanationText, renderPanel } from './panel.js';
 import { COLORS, PitchView } from './pitch.js';
 import { Playback } from './playback.js';
 import { PovView } from './pov.js';
@@ -19,6 +20,9 @@ const el = {
   scoreboard: $('scoreboard'),
   description: $('scenario-description'),
   title: $('scenario-title'),
+  kicker: $('scenario-kicker'),
+  moments: $('moments-col'),
+  pick: $('pick-card'),
   avatar: $('avatar'),
   badge: $('mode-badge'),
   knowledge: $('knowledge-badge'),
@@ -58,6 +62,8 @@ const state = {
   situation: null,
   selection: null,
   requestId: 0,
+  momentNow: -1,      // the moment the timeline is at (index into the frames)
+  done: new Set(),    // moments where a player was opened
   // Player's view: follows one player through the timeline, even after the
   // selection is cleared by playing or stepping.
   pov: { on: false, playerId: null, team: null, yawOffset: 0 },
@@ -121,6 +127,8 @@ async function loadScenario(id) {
   el.situationSelect.innerHTML = state.situations
     .map((s, i) => `<option value="${i}">${situationLabel(s)}${i === 0 ? ' (scenario)' : ''}</option>`)
     .join('');
+  state.done = loadDone(id);
+  state.momentNow = -1;
   setSituation(0);
   state.pov.playerId = null;
   clearSelection();
@@ -137,6 +145,7 @@ function setSituation(index) {
   state.situation = state.situations[index];
   const { teams } = state.scenario;
   const { score, minute } = state.situation;
+  if (state.momentNow >= 0) renderMoments();
   el.scoreboard.innerHTML = `
     <span class="team-home">${teams.home.name.toUpperCase()}</span>
     <span>${score.home} – ${score.away}</span>
@@ -153,6 +162,8 @@ async function select(player, frameIndex) {
     situation: state.situation,
   };
   state.selection = { player, frameIndex, geometry: null, analysis: null, error: null };
+  state.done = markDone(state.scenario.id, frameIndex);
+  renderMoments();
   if (state.pov.playerId !== player.id) state.pov.yawOffset = 0;
   state.pov.playerId = player.id;
   state.pov.team = player.team;
@@ -309,8 +320,99 @@ function clearSelection() {
 }
 
 function render() {
-  if (state.mode === 'analyse') renderPanel(el.panel, state);
+  if (state.mode !== 'analyse') return;
+  renderPanel(el.panel, state);
+  renderPick();
 }
+
+// ---- moments: the match as a playlist (no locks) -----------------------------
+
+function syncMoment() {
+  const i = playback.nearestKeyframe();
+  if (i !== state.momentNow) {
+    state.momentNow = i;
+    renderMoments();
+  }
+}
+
+function renderMoments() {
+  const sc = state.scenario;
+  const i = Math.max(0, state.momentNow);
+  el.moments.innerHTML = momentsHtml(sc, i, state.done);
+  el.title.textContent = momentTitle(sc, i);
+  el.kicker.textContent = `${sc.title} · Moment ${i + 1} of ${sc.frames.length}${state.situation ? ` · ${state.situation.minute}'` : ''}`;
+}
+
+function jumpTo(index) {
+  changeTime(() => {
+    playback.pause();
+    playback.seekToFrame(index);
+  });
+}
+
+el.moments.addEventListener('click', (e) => {
+  if (!state.scenario) return;
+  const action = e.target.closest('[data-moment]')?.dataset.moment;
+  const row = e.target.closest('[data-moment-row]');
+  if (action === 'continue') jumpTo(nextMoment(state.scenario, state.momentNow, state.done));
+  else if (action === 'replay') changeTime(() => { playback.seek(playback.start); playback.play(); });
+  else if (row) jumpTo(Number(row.dataset.momentRow));
+});
+el.moments.addEventListener('keydown', (e) => {
+  const row = e.target.closest('[data-moment-row]');
+  if (row && (e.key === 'Enter' || e.key === ' ')) {
+    e.preventDefault();
+    jumpTo(Number(row.dataset.momentRow));
+  }
+});
+
+// ---- "Your pick": options under the pitch for the player on the ball -----------
+
+const AGENT_COLOURS = { field_mapper: '#be123c', tactical_context: '#2563eb', decision: '#c2410c', coach: '#1d1416' };
+
+function agentDots() {
+  const stages = state.config.stages;
+  if (!stages.length) return '';
+  return `<div class="agent-dots">${stages.map((s) => `<span class="agent-dot" style="background:${AGENT_COLOURS[s.key] ?? '#6f6468'}" title="${s.agent}">${agentInitials(s.agent)}</span>`).join('')}
+    <span class="sub">Explained by ${stages.length} Foundry agent${stages.length === 1 ? '' : 's'}</span></div>`;
+}
+
+function renderPick() {
+  const sel = state.selection;
+  const g = sel?.geometry;
+  let body;
+  if (!sel) {
+    body = '<p class="sub">Pause and click a Blue player. If they have the ball, you make your pick first, then see the agents&rsquo; answer.</p>';
+  } else if (!g) {
+    body = '<div class="loading"><span class="spinner"></span>Reading the pitch…</div>';
+  } else if (!sel.call) {
+    body = `<p class="sub">#${sel.player.id} doesn't have the ball: the answer on the right shows where to be and what to do if it comes.</p>`;
+  } else {
+    // The three nearest teammates (a neutral order, so the list doesn't give the answer away), then dribble and shoot.
+    const mates = g.teammates
+      .filter((o) => o.role !== 'goalkeeper')
+      .sort((a, b) => a.distance_m - b.distance_m)
+      .slice(0, 3)
+      .map((o) => ({ key: `pass:${o.id}`, label: `Pass to #${o.id}`, choice: { action: 'pass', target_player_id: o.id } }));
+    const options = [...mates,
+      { key: 'dribble', label: 'Dribble', choice: { action: 'dribble' } },
+      { key: 'shoot', label: 'Shoot', choice: { action: 'shoot' } }];
+    const mine = sel.call.choice;
+    const isMine = (c) => mine && mine.action === c.action && (c.action !== 'pass' || mine.target_player_id === c.target_player_id);
+    body = `<div class="picks">${options.map((o, i) => `
+      <button class="pick${isMine(o.choice) ? ' on' : ''}" data-pick="${o.key}">
+        <span class="letter">${isMine(o.choice) ? '✓' : String.fromCharCode(65 + i)}</span>${o.label}</button>`).join('')}</div>
+      <p class="sub pick-note">Or click any teammate on the pitch.</p>`;
+  }
+  el.pick.innerHTML = `<div class="answer-label">Your pick</div>${body}${agentDots()}`;
+}
+
+el.pick.addEventListener('click', (e) => {
+  const key = e.target.closest('[data-pick]')?.dataset.pick;
+  if (!key || !state.selection?.call) return;
+  const [action, id] = key.split(':');
+  makeChoice(action === 'pass' ? { action, target_player_id: Number(id) } : { action });
+});
 
 // ---- modes --------------------------------------------------------------
 
@@ -369,6 +471,7 @@ function loop(now) {
     training.draw(now);
   } else if (state.mode === 'analyse') {
     playback.tick(dt);
+    syncMoment();
     draw(now);
     drawPov();
     syncControls();

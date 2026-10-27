@@ -37,6 +37,7 @@
   <aside id="scout-panel" class="scout-panel" hidden aria-label="KnowledgeScout proposals"></aside>
 
   <main class="layout" id="analyse-view">
+    <aside id="moments-col" class="moments-col" aria-label="The match's moments"></aside>
     <section class="stage">
       <div id="start-here" class="start-here" hidden>
         <ol>
@@ -49,7 +50,7 @@
       </div>
       <div class="page-head">
         <div class="page-head-text">
-          <div class="kicker">Your match · Blue v Red</div>
+          <div class="kicker" id="scenario-kicker">Your match · Blue v Red</div>
           <h1 id="scenario-title" class="page-title">Analyse</h1>
           <p id="scenario-description" class="scenario-description"></p>
         </div>
@@ -105,6 +106,8 @@
           </select>
         </div>
       </div>
+
+      <div id="pick-card" class="card pick-card" aria-live="polite"></div>
 
       <p class="key-hints" aria-label="Keyboard shortcuts">
         <span><kbd>Space</kbd> play / pause</span>

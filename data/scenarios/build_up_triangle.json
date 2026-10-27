@@ -16,6 +16,7 @@
     "away": "left"
   },
   "key_frame": 3,
+  "moment_titles": ["Build-up from the back", "Into midfield", "#6 receives", "Find the free man", "Pass to #8", "#8 turns", "Out to the wing", "#7 on the right"],
   "match_situation": {
     "minute": 63,
     "score": {

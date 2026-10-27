@@ -28,6 +28,7 @@ export function renderPanel(panel, { config, scenario, selection }) {
     call?.asking ? askCard(call) : '',
     call?.choice ? verdictCard(call.choice, selection) : '',
     answerCard(config, selection),
+    agentsReadCard(config, selection),
     selection.analysis ? clarityCard(selection.clarity) : '',
     `<details class="how"${howOpen ? ' open' : ''}>
       <summary>See how the agents decided</summary>
@@ -70,17 +71,77 @@ function answerCard(config, selection) {
   }
   const live = analysis.stages.every((s) => s.source === 'foundry');
   const timing = analysis.cached ? 'instant (saved answer)' : `${(analysis.total_ms / 1000).toFixed(1)} s`;
+  const facts = answerFacts(d, g);
   return `
     <div class="card answer">
-      <div class="answer-label">Best move</div>
+      <div class="answer-label">EagleEye's answer</div>
       ${move}
       ${coach ? `<p class="answer-why">${esc(coach)}</p>` : ''}
-      ${d?.scan_cue ? `<p class="scan-cue"><span>Look first</span>${esc(d.scan_cue)}</p>` : ''}
+      ${d?.scan_cue ? `<p class="scan-cue"><span>Scan tip</span>${esc(d.scan_cue)}</p>` : ''}
+      ${facts.length ? `<div class="chips">${facts.map((f) => `<span class="chip">${esc(f)}</span>`).join('')}</div>` : ''}
       <div class="agent-meta">
         <span>${live ? `${analysis.stages.length} Microsoft Foundry agents` : 'Offline text (agents unavailable)'}</span>
         <span>${timing}</span>
       </div>
     </div>`;
+}
+
+/** Measured facts behind the answer, as chips: the pass, the room, the opponents close by. */
+function answerFacts(d, g) {
+  if (!d || !g) return [];
+  const facts = [];
+  if (d.action === 'pass') {
+    const t = g.teammates.find((o) => o.id === d.target_player_id);
+    if (t) facts.push(`${Math.round(t.distance_m)} m pass`, `${Math.round(t.receiver_space_m)} m of room`, t.lane_open ? 'lane open' : 'lane tight');
+  } else if (d.action === 'dribble') {
+    facts.push(`${Math.round(g.free_space?.space_m ?? 0)} m of free space`);
+  } else if (d.action === 'shoot' && g.shot) {
+    facts.push(`${Math.round(g.shot.distance_m)} m out`, `${chanceText(g.shot.xg)} chance`);
+  }
+  const near = (g.pressure?.nearest_opponents ?? []).filter((o) => o.distance_m < 10).length;
+  facts.push(near ? `${near} opponent${near === 1 ? '' : 's'} within 10 m` : 'no opponent within 10 m');
+  return facts;
+}
+
+/** "How the agents read it": one line from each Foundry agent, in chain order. The full cards stay below. */
+function agentsReadCard(config, selection) {
+  const stages = selection.analysis?.stages;
+  if (!stages?.length || selection.error) return '';
+  const colours = { field_mapper: '#be123c', tactical_context: '#2563eb', decision: '#c2410c', coach: '#1d1416' };
+  const labels = { field_mapper: 'The picture', tactical_context: 'Tactics', decision: 'Decision', coach: 'Coach' };
+  const line = (s) => {
+    if (s.key === 'tactical_context' && s.data) {
+      return `${capitalise(s.data.phase)}, ${s.data.mode === 'keep' ? 'keep the ball' : 'go forward'}${s.data.principles?.[0] ? `: ${s.data.principles[0]}` : ''}`;
+    }
+    if (s.key === 'decision' && s.data) return `${moveText(s.data)}${s.data.reason ? `: ${s.data.reason}` : ''}`;
+    return s.output;
+  };
+  const rows = stages.map((s) => {
+    const agent = config.stages.find((c) => c.key === s.key)?.agent ?? s.key;
+    return `<li><span class="agent-dot" style="background:${colours[s.key] ?? '#6f6468'}" title="${esc(agent)}">${agentInitials(agent)}</span>
+      <p><strong>${labels[s.key] ?? esc(agent)}:</strong> ${esc(firstSentences(line(s)))}</p></li>`;
+  }).join('');
+  return `
+    <div class="card agents-read">
+      <div class="answer-label">How ${stages.length} Foundry agents read it</div>
+      <ul class="agent-lines">${rows}</ul>
+    </div>`;
+}
+
+/** "FieldMapper" -> FM, "TacticalContextAgent" -> TC, "DecisionAgent" -> DA. */
+export function agentInitials(name) {
+  const base = String(name).replace(/Agent$/, '');
+  const caps = base.match(/[A-Z]/g) ?? [base.charAt(0).toUpperCase()];
+  return (caps.length >= 2 ? caps.slice(0, 2) : [caps[0], 'A']).join('');
+}
+
+/** Plain text, cut to the first sentence or two (at most about 170 characters). */
+function firstSentences(text) {
+  const plain = String(text ?? '').replace(/\*\*|`/g, '').replace(/^\s*(?:[-*•]|\d+[.)])\s+/gm, '').replace(/\s+/g, ' ').trim();
+  const sentences = plain.match(/[^.!?]+[.!?]+/g) ?? [plain];
+  let out = sentences[0];
+  if (out.length < 80 && sentences[1]) out += sentences[1];
+  return out.length > 170 ? `${out.slice(0, 167).trimEnd()}…` : out.trim();
 }
 
 /** "What would you do?": the player decides before seeing the agents' answer. */
@@ -90,10 +151,8 @@ function askCard(call) {
     <div class="card call">
       <div class="answer-label">${again ? 'Try another option' : 'Your call'}</div>
       <h3 class="call-question">${again ? 'What else could you do?' : 'You have the ball. What would you do?'}</h3>
-      <p class="sub">Click a teammate on the pitch to pass to them, or:</p>
+      <p class="sub">Pick an option under the pitch, or click a teammate on it.</p>
       <div class="call-buttons">
-        <button class="choice-btn" data-call="dribble">Dribble</button>
-        <button class="choice-btn" data-call="shoot">Shoot</button>
         ${again ? '' : '<button class="link-btn" data-call="skip">Skip: just show me</button>'}
         <button class="link-btn" data-call="other">Look at another player</button>
       </div>
@@ -249,7 +308,7 @@ function chanceText(xg) {
 
 function moveText(d) {
   if (!d) return '';
-  return d.action === 'pass' && d.target_player_id != null ? `PASS → #${d.target_player_id}` : d.action.toUpperCase();
+  return d.action === 'pass' && d.target_player_id != null ? `Pass → #${d.target_player_id}` : capitalise(d.action);
 }
 
 /**
