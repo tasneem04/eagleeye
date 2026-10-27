@@ -54,41 +54,40 @@
         <canvas id="pitch" aria-label="Bird's-eye view of the pitch"></canvas>
         <div id="scoreboard" class="scoreboard" hidden></div>
         <div id="pitch-hint" class="pitch-hint" hidden></div>
-      </div>
-
-      <div class="controls" aria-label="Playback and tools">
-        <button id="btn-restart" class="icon-btn" title="Rewind to start" aria-label="Rewind to start">
-          <svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14l-10-7z"/></svg>
-        </button>
-        <button id="btn-back" class="icon-btn" title="Previous frame (←)" aria-label="Previous frame">
-          <svg viewBox="0 0 24 24"><path d="M15 5v14l-9-7z"/></svg>
-        </button>
-        <button id="btn-play" class="icon-btn primary" title="Play / Pause (Space)" aria-label="Play">
-          <svg id="icon-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg>
-          <svg id="icon-pause" viewBox="0 0 24 24" style="display: none"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
-        </button>
-        <button id="btn-forward" class="icon-btn" title="Next frame (→)" aria-label="Next frame">
-          <svg viewBox="0 0 24 24"><path d="M9 5v14l9-7z"/></svg>
-        </button>
-        <div class="timeline">
-          <input id="timeline" type="range" min="0" max="1" step="0.01" value="0" aria-label="Timeline">
-          <div id="timeline-marks" class="timeline-marks"></div>
+        <div class="controls" aria-label="Playback and tools">
+          <button id="btn-restart" class="icon-btn" title="Rewind to start" aria-label="Rewind to start">
+            <svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14l-10-7z"/></svg>
+          </button>
+          <button id="btn-back" class="icon-btn" title="Previous frame (←)" aria-label="Previous frame">
+            <svg viewBox="0 0 24 24"><path d="M15 5v14l-9-7z"/></svg>
+          </button>
+          <button id="btn-play" class="icon-btn primary" title="Play / Pause (Space)" aria-label="Play">
+            <svg id="icon-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg>
+            <svg id="icon-pause" viewBox="0 0 24 24" style="display: none"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+          </button>
+          <button id="btn-forward" class="icon-btn" title="Next frame (→)" aria-label="Next frame">
+            <svg viewBox="0 0 24 24"><path d="M9 5v14l9-7z"/></svg>
+          </button>
+          <div class="timeline">
+            <input id="timeline" type="range" min="0" max="1" step="0.01" value="0" aria-label="Timeline">
+            <div id="timeline-marks" class="timeline-marks"></div>
+          </div>
+          <span id="time-label" class="time-label">0.0 s</span>
+          <label class="toggle" title="Simplified pitch control × threat: gold = valuable space the selected team can win">
+            <input id="heatmap-toggle" type="checkbox"> Space
+          </label>
+          <button id="pov-toggle" class="pill-btn" type="button" aria-pressed="false" aria-controls="pov-card" title="Player's view: see the moment through your eyes (V)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C6.5 5 2.7 9.2 1.5 12c1.2 2.8 5 7 10.5 7s9.3-4.2 10.5-7C21.3 9.2 17.5 5 12 5zm0 11.5A4.5 4.5 0 1 1 12 7.5a4.5 4.5 0 0 1 0 9zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg>
+            <span class="pov-label">Player's view</span>
+          </button>
+          <select id="situation-select" class="mini-select" aria-label="Match situation" title="Match situation: the same moment under a different score and minute"></select>
+          <select id="speed-select" class="mini-select" aria-label="Playback speed">
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+            <option value="2">2×</option>
+          </select>
+          <select id="scenario-select" hidden aria-label="Scenario"></select>
         </div>
-        <span id="time-label" class="time-label">0.0 s</span>
-        <label class="toggle" title="Simplified pitch control × threat: gold = valuable space the selected team can win">
-          <input id="heatmap-toggle" type="checkbox"> Space
-        </label>
-        <button id="pov-toggle" class="pill-btn" type="button" aria-pressed="false" aria-controls="pov-card" title="Player's view: see the moment through your eyes (V)">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C6.5 5 2.7 9.2 1.5 12c1.2 2.8 5 7 10.5 7s9.3-4.2 10.5-7C21.3 9.2 17.5 5 12 5zm0 11.5A4.5 4.5 0 1 1 12 7.5a4.5 4.5 0 0 1 0 9zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg>
-          <span class="pov-label">Player's view</span>
-        </button>
-        <select id="situation-select" class="mini-select" aria-label="Match situation" title="Match situation: the same moment under a different score and minute"></select>
-        <select id="speed-select" class="mini-select" aria-label="Playback speed">
-          <option value="0.5">0.5×</option>
-          <option value="1" selected>1×</option>
-          <option value="2">2×</option>
-        </select>
-        <select id="scenario-select" hidden aria-label="Scenario"></select>
       </div>
 
       <div id="pick-card" class="card pick-card" aria-live="polite"></div>

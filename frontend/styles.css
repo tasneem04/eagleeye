@@ -304,11 +304,19 @@ kbd {
 @keyframes nudge { 20%, 60% { transform: translateX(-4px); } 40%, 80% { transform: translateX(4px); } }
 
 /* the moment */
-.page-head { margin-bottom: 18px; }
+.page-head { margin-bottom: 14px; }
 .page-head .kicker { font-size: 12px; }
-.page-title { margin: 4px 0 4px; font-size: 32px; font-weight: 700; line-height: 1.15; }
-.scenario-description { margin: 0; color: var(--muted); font-size: 16px; }
-.pitch-wrap { position: relative; border-radius: 18px; overflow: hidden; background: var(--pitch); padding: 11% 0; }
+.page-title { margin: 2px 0 2px; font-size: 32px; font-weight: 700; line-height: 1.15; }
+.scenario-description { margin: 0; color: var(--muted); font-size: 15px; }
+/* The green box: the pitch in the middle, the slim playback bar along its bottom edge. */
+.pitch-wrap { position: relative; border-radius: 18px; overflow: hidden; background: var(--pitch); padding: 5% 0 calc(5% + 46px); }
+.pitch-wrap .controls {
+  position: absolute; left: 12px; right: 12px; bottom: 10px; margin: 0;
+  background: rgba(255, 255, 255, 0.94); border-color: transparent; box-shadow: 0 2px 8px rgba(29, 20, 22, 0.12);
+  flex-wrap: nowrap;
+}
+.pitch-wrap .timeline { min-width: 50px; }
+.stage .pick-card { margin-top: 14px; }
 #pitch { display: block; width: 100%; cursor: pointer; }
 .scoreboard, .pitch-hint { display: none !important; }
 
@@ -346,13 +354,13 @@ kbd {
 .pick-card { border-radius: 16px; padding: 18px 18px 16px; }
 .picks { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
 .pick {
-  display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 8px 12px 8px 10px;
+  display: flex; align-items: center; gap: 8px; min-height: 46px; padding: 8px 10px 8px 8px;
   border-radius: 12px; border: 1px solid var(--border); background: var(--surface); cursor: pointer;
-  font-weight: 600; font-size: 15px; text-align: left; color: var(--text);
+  font-weight: 600; font-size: 14.5px; text-align: left; color: var(--text); white-space: nowrap; overflow: hidden;
 }
 .pick:hover { border-color: var(--muted-2); }
-.pick .letter { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); color: var(--muted); font-size: 12px; font-weight: 700; flex-shrink: 0; }
-.pick.on { border: 2px solid var(--ok); background: var(--ok-light); color: var(--ok); padding: 7px 11px 7px 9px; }
+.pick .letter { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); color: var(--muted); font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.pick.on { border: 2px solid var(--ok); background: var(--ok-light); color: var(--ok); padding: 7px 9px 7px 7px; }
 .pick.on .letter { background: var(--ok); color: #fff; }
 .pick-card > .sub, .pick-card > .loading { margin: 10px 0 0; }
 .agent-dots { display: flex; align-items: center; margin-top: 16px; }
