@@ -91,3 +91,4 @@ Nothing a player does changes the coaching knowledge. Only KnowledgeScout resear
 ## Roadmap (after the hackathon)
 
 - Learning from real matches, only with properly licensed data, and outside this hackathon. This submission uses synthetic data only, as the rules require.
+- Cloud save (Azure Cosmos DB) with parent consent, for coach and team dashboards. Today each player's progress, level and "since you started" record stay in their own browser, and the player code moves them to another device; the server keeps nothing about players.

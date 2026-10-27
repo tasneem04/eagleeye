@@ -95,13 +95,13 @@ export class Training {
       try {
         profiles.setDemoHistory((await api.getDemoHistory()).history);
       } catch { /* the demo player just starts empty */ }
-      await this.#recommend();
+      profiles.keepStorage();
     }
     if (!profiles.currentProfile()) {
       this.#showWho();
       return;
     }
-    await this.#brief(this.trial ?? this.#randomDrill());
+    await this.#playAs();
   }
 
   /** "Who's playing?": pick or create a player before training. */
@@ -113,9 +113,17 @@ export class Training {
     this.#render();
   }
 
+  /** Start where this player left off: their saved level, and a drill from that level. */
   async #playAs() {
+    this.level = profiles.savedLevel();
+    if (this.trial?.kind === 'drill' && this.trial.level !== this.level) this.trial = null;
     await this.#recommend();
     await this.#brief(this.trial ?? this.#randomDrill());
+  }
+
+  #setLevel(level) {
+    this.level = level;
+    profiles.saveLevel(level);
   }
 
   exit() {
@@ -797,6 +805,7 @@ export class Training {
     return `
       <div class="card">
         <h3>Your progress${p?.demo ? ' <span class="sub">(sample history)</span>' : ''}</h3>
+        ${sinceHtml(profiles.loadRecord(), h)}
         ${sparkline(last.map((r) => r.score))}
         <ul class="facts">
           <li><span class="k">Last scores</span><span>${last.map((r) => r.score).join(' → ')}</span></li>
@@ -805,7 +814,9 @@ export class Training {
         </ul>
         ${this.codeShown ? `<textarea class="text-input code-out" rows="3" readonly>${esc(this.codeShown)}</textarea>
           <div class="sub">Paste this code on another device under "Who's playing?". It holds only your nickname and drill results.</div>` : ''}
-        <div class="sub progress-actions">Kept only on this device.
+        <div class="sub progress-actions">${!profiles.storageWorks()
+          ? '<strong>This browser isn\'t saving your progress</strong> (blocked storage). Copy your player code to keep it.'
+          : p?.demo ? 'Kept only on this device.' : 'Saved in this browser on this device. On another device, use your player code.'}
           ${code}
           <button class="choice-btn" data-train="reset-progress">${p?.demo ? 'Reset the sample' : 'Reset my progress'}</button>
           ${p && !p.demo ? '<button class="link-btn" data-train="delete-player">Delete this player</button>' : ''}
@@ -827,12 +838,12 @@ export class Training {
       const rec = this.recommendation;
       const trial = this.trials.find((t) => t.id === rec?.next_trial_id);
       if (!trial) return;
-      if (rec.next_level !== this.level) this.level = rec.next_level;
+      if (rec.next_level !== this.level) this.#setLevel(rec.next_level);
       this.#brief(trial);
       return;
     }
     if (action === 'level-suggest') {
-      this.level = btn.dataset.level;
+      this.#setLevel(btn.dataset.level);
       this.#brief(this.#randomDrill());
       return;
     }
@@ -853,7 +864,7 @@ export class Training {
       return;
     }
     if (action === 'level') {
-      this.level = btn.dataset.level;
+      this.#setLevel(btn.dataset.level);
       // Drills are built for one level; switch to one of the new level's drills.
       if (this.trial.kind === 'drill' && this.trial.level !== this.level) this.#brief(this.#randomDrill());
       else this.#render();
@@ -941,7 +952,7 @@ export class Training {
   /** What the weak-spot finder needs, and nothing that identifies the player. */
   #saveHistory(result) {
     const h = profiles.loadHistory();
-    h.push({
+    const item = {
       trial_id: this.trial.id,
       level: this.level,
       score: result.score,
@@ -954,7 +965,9 @@ export class Training {
       opened_body: Boolean(result.opened_body),
       missed: result.missed.slice(0, 12).map((m) => ({ side: m.side, angle: m.angle, open: m.open })),
       at: Date.now(),
-    });
+    };
+    profiles.recordDrill(item); // first, so a record built from older history doesn't count it twice
+    h.push(item);
     profiles.saveHistory(h);
   }
 }
@@ -974,6 +987,35 @@ function pictureTrend(shares) {
   const diff = Math.round(shares.at(-1) * 100) - Math.round(shares.at(-2) * 100);
   const word = diff > 0 ? 'better than last drill ↑' : diff < 0 ? 'fewer than last drill' : 'same as last drill';
   return `${shares.map(pct).join(' → ')}, ${word}`;
+}
+
+/** "Since you started": the first drills against the latest ones, with the level beside the score
+ * (moving up a level lowers scores, so the picture % comes first). */
+function sinceHtml(record, history) {
+  if (!record) return '';
+  const date = record.since ? new Date(record.since).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '';
+  const count = `${record.drills} drill${record.drills === 1 ? '' : 's'}${date ? ` since ${date}` : ''}`;
+  const bests = [`score ${record.best_score}`, record.best_coverage != null ? `picture ${pct(record.best_coverage)}` : '',
+    `played up to ${LEVEL_NAMES[record.best_level]}`].filter(Boolean).join(' · ');
+  const rows = [['Drills', count]];
+  const latest = history.slice(-profiles.FIRST_DRILLS);
+  if (record.drills >= 2 * profiles.FIRST_DRILLS && record.first.length && latest.length) {
+    const avg = (xs) => xs.reduce((s, x) => s + x, 0) / xs.length;
+    const thenPic = record.first.map((f) => f.coverage).filter(Number.isFinite);
+    const nowPic = latest.map((h) => h.coverage).filter(Number.isFinite);
+    if (thenPic.length && nowPic.length) rows.push(['Picture', `${pct(avg(thenPic))} → ${pct(avg(nowPic))}`]);
+    const [from, to] = [record.first[0].level, latest.at(-1).level];
+    const levels = from === to ? LEVEL_NAMES[to] : `${LEVEL_NAMES[from]} → ${LEVEL_NAMES[to]}`;
+    rows.push(['Score', `${Math.round(avg(record.first.map((f) => f.score)))} → ${Math.round(avg(latest.map((h) => h.score)))} (${levels})`]);
+  } else {
+    rows.push(['First vs now', `after ${2 * profiles.FIRST_DRILLS} drills`]);
+  }
+  rows.push(['Best', bests]);
+  return `
+    <div class="since">
+      <div class="answer-label">Since you started</div>
+      <ul class="facts">${rows.map(([k, v]) => `<li><span class="k">${k}</span><span>${esc(v)}</span></li>`).join('')}</ul>
+    </div>`;
 }
 
 /** A tiny line of recent scores (0-100). */

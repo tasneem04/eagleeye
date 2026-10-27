@@ -31,6 +31,26 @@ function write(key, value) {
 }
 
 const historyKey = (id) => `${OLD_HISTORY_KEY}.${id}`;
+const recordKey = (id) => `eagleeye.record.${id}`;
+export const FIRST_DRILLS = 3; // "where you started" is the average of the first few drills
+
+const num = (v, lo, hi) => Number.isFinite(v) && v >= lo && v <= hi;
+
+/** False when this browser won't keep anything (blocked storage). */
+export function storageWorks() {
+  try {
+    localStorage.setItem('eagleeye.check', '1');
+    localStorage.removeItem('eagleeye.check');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Ask the browser not to clear EagleEye's storage when space runs low. It may say no; that's fine. */
+export function keepStorage() {
+  navigator.storage?.persist?.().catch(() => { /* not granted: storage is still kept normally */ });
+}
 
 export function setDemoHistory(history) {
   demoHistory = cleanHistory(history);
@@ -84,7 +104,24 @@ export function deleteProfile(id) {
   data.list = data.list.filter((p) => p.id !== id);
   if (data.current === id) data.current = null;
   write(PROFILES_KEY, data);
-  try { localStorage.removeItem(historyKey(id)); } catch { /* fine */ }
+  try {
+    localStorage.removeItem(historyKey(id));
+    localStorage.removeItem(recordKey(id));
+  } catch { /* fine */ }
+}
+
+/** The level this player trains at, so the next visit starts where they left off. */
+export function savedLevel() {
+  const p = currentProfile();
+  return p && !p.demo && LEVELS.includes(p.level) ? p.level : 'rookie';
+}
+
+export function saveLevel(level) {
+  const data = loadProfiles();
+  const p = data.list.find((x) => x.id === data.current);
+  if (!p || !LEVELS.includes(level)) return;
+  p.level = level;
+  write(PROFILES_KEY, data);
 }
 
 /** The current player's recent drills. The demo player starts from the labelled sample. */
@@ -104,14 +141,68 @@ export function saveHistory(history) {
 export function resetHistory() {
   const p = currentProfile();
   if (!p) return;
-  try { localStorage.removeItem(historyKey(p.id)); } catch { /* fine */ }
+  try {
+    localStorage.removeItem(historyKey(p.id));
+    localStorage.removeItem(recordKey(p.id));
+  } catch { /* fine */ }
+}
+
+/**
+ * "Since you started": a small record that is never cut, unlike the last-30 history.
+ * Built only from graded drills. Players from before the record get it from their saved
+ * history once; the demo player's is always worked out from its sample.
+ */
+export function loadRecord() {
+  const p = currentProfile();
+  if (!p) return null;
+  if (p.demo) return recordFrom(loadHistory());
+  const stored = cleanRecord(read(recordKey(p.id), null));
+  if (stored) return stored;
+  const record = recordFrom(loadHistory());
+  if (record) write(recordKey(p.id), record);
+  return record;
+}
+
+/** Add one graded drill to the record. Call before the drill is added to the history. */
+export function recordDrill(item) {
+  const p = currentProfile();
+  if (p && !p.demo) write(recordKey(p.id), addToRecord(loadRecord(), item));
+}
+
+function recordFrom(history) {
+  return history.reduce((record, h) => addToRecord(record, h), null);
+}
+
+function addToRecord(record, h) {
+  const r = record ?? { drills: 0, first: [], best_score: 0, best_coverage: null, best_level: 'rookie', since: h.at ?? null };
+  r.drills += 1;
+  if (r.first.length < FIRST_DRILLS) r.first.push({ score: h.score, coverage: h.coverage ?? null, level: h.level });
+  r.best_score = Math.max(r.best_score, h.score);
+  if (num(h.coverage, 0, 1)) r.best_coverage = Math.max(r.best_coverage ?? 0, h.coverage);
+  if (LEVELS.indexOf(h.level) > LEVELS.indexOf(r.best_level)) r.best_level = h.level;
+  return r;
+}
+
+function cleanRecord(r) {
+  if (!r || !num(r.drills, 1, 1e6) || !Array.isArray(r.first) || !num(r.best_score, 0, 100)) return null;
+  return {
+    drills: Math.floor(r.drills),
+    first: r.first.slice(0, FIRST_DRILLS).filter((f) => f && num(f.score, 0, 100) && LEVELS.includes(f.level))
+      .map((f) => ({ score: f.score, coverage: num(f.coverage, 0, 1) ? f.coverage : null, level: f.level })),
+    best_score: r.best_score,
+    best_coverage: num(r.best_coverage, 0, 1) ? r.best_coverage : null,
+    best_level: LEVELS.includes(r.best_level) ? r.best_level : 'rookie',
+    since: num(r.since, 0, 1e15) ? r.since : null,
+  };
 }
 
 /** A copy of this profile to carry to another device. It contains no personal data. */
 export function playerCode() {
   const p = currentProfile();
   if (!p || p.demo) return '';
-  const json = JSON.stringify({ v: 1, name: p.name, colour: p.colour, history: loadHistory() });
+  const json = JSON.stringify({
+    v: 2, name: p.name, colour: p.colour, level: savedLevel(), history: loadHistory(), record: loadRecord(),
+  });
   return CODE_PREFIX + btoa(String.fromCharCode(...new TextEncoder().encode(json)));
 }
 
@@ -129,6 +220,9 @@ export function importPlayerCode(code) {
   const profile = createProfile(data?.name, data?.colour);
   if (!profile) throw new Error('That player code has no nickname.');
   write(historyKey(profile.id), cleanHistory(data.history));
+  const record = cleanRecord(data.record); // v1 codes have none: it is rebuilt from the history
+  if (record) write(recordKey(profile.id), record);
+  saveLevel(data.level);
   return profile;
 }
 
@@ -139,7 +233,6 @@ function cleanName(name) {
 /** Keep only well-formed drill results (the same fields the server's NextRequest accepts). */
 function cleanHistory(history) {
   if (!Array.isArray(history)) return [];
-  const num = (v, lo, hi) => Number.isFinite(v) && v >= lo && v <= hi;
   return history.slice(-HISTORY_SIZE).filter((h) => h && typeof h.trial_id === 'string' && h.trial_id.length <= 120
     && LEVELS.includes(h.level) && VERDICTS.includes(h.verdict) && num(h.score, 0, 100)
     && num(h.scans, 0, 50) && num(h.target_scans, 1, 20))
