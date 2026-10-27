@@ -4,7 +4,7 @@
 
 import { COLORS } from './pitch.js';
 
-const TONE = { good: COLORS.open, ok: '#f5c542', risky: '#ef4444' };
+const TONE = { good: '#15803d', ok: '#7a5600', risky: '#c2410c' }; // label text on white
 
 /** Players and ball at this instant. Each step eases from the previous snapshot to its own. */
 export function replayFrame(replay, players, now) {
@@ -43,7 +43,7 @@ export function drawReplayMarks(view, frame, tone) {
   if (frame.aim) {
     const [x1, y1] = view.toPx(frame.ball.x, frame.ball.y);
     const [x2, y2] = view.toPx(frame.aim.to.x, frame.aim.to.y);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
     ctx.lineWidth = 2;
     ctx.setLineDash([6, 8]);
     ctx.beginPath();
@@ -54,15 +54,17 @@ export function drawReplayMarks(view, frame, tone) {
   }
   if (frame.label) {
     const [x, y] = view.toPx(frame.ball.x, frame.ball.y);
-    ctx.font = '700 13px Inter, system-ui, sans-serif';
+    ctx.font = '700 13px "DM Sans", system-ui, sans-serif';
     const w = ctx.measureText(frame.label).width + 16;
     const colour = TONE[tone] ?? TONE.ok;
     const top = y - view.playerRadius - 34;
-    ctx.fillStyle = 'rgba(10, 15, 26, 0.88)';
+    ctx.fillStyle = '#ffffff';
     ctx.strokeStyle = colour;
     ctx.lineWidth = 2;
-    ctx.fillRect(x - w / 2, top, w, 24);
-    ctx.strokeRect(x - w / 2, top, w, 24);
+    ctx.beginPath();
+    ctx.roundRect(x - w / 2, top, w, 24, 12);
+    ctx.fill();
+    ctx.stroke();
     ctx.fillStyle = colour;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

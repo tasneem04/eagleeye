@@ -5,6 +5,7 @@ import { COLORS, PitchView } from './pitch.js';
 import { Playback } from './playback.js';
 import { PovView } from './pov.js';
 import { drawReplayMarks, replayFrame } from './replay.js';
+import * as profiles from './profiles.js';
 import { ScoutPanel } from './scout.js';
 import { Training } from './training.js';
 
@@ -17,6 +18,8 @@ const el = {
   situationSelect: $('situation-select'),
   scoreboard: $('scoreboard'),
   description: $('scenario-description'),
+  title: $('scenario-title'),
+  avatar: $('avatar'),
   badge: $('mode-badge'),
   knowledge: $('knowledge-badge'),
   play: $('btn-play'),
@@ -37,7 +40,16 @@ const el = {
 
 const view = new PitchView(el.canvas);
 const playback = new Playback();
-const training = new Training({ canvas: el.canvas, view, panel: el.panel, hud: $('train-hud') });
+const training = new Training({
+  canvas: $('train-pov'),
+  root: $('train-view'),
+  layer: $('train-layer'),
+  page: $('train-page'),
+  progress: $('progress-view'),
+  hud: $('train-hud'),
+  onMode: (mode) => setMode(mode),
+});
+training.onProfile = updateAvatar;
 const state = {
   mode: 'analyse',
   config: { mode: 'mock', stages: [] },
@@ -80,7 +92,9 @@ async function init() {
     el.scenarioSelect.innerHTML = matches.map(option).join('')
       + (drills.length ? `<optgroup label="Train drills">${drills.map(option).join('')}</optgroup>` : '');
     await loadScenario(scenarios[0].id);
+    updateAvatar();
     if (location.hash === '#train') setMode('train');
+    else if (location.hash === '#progress') setMode('progress');
   } catch (err) {
     el.badge.textContent = 'Server unavailable';
     el.panel.innerHTML = `<div class="card"><div class="warning">${err.message}</div></div>`;
@@ -92,6 +106,7 @@ async function loadScenario(id) {
   state.scenario = await api.getScenario(id);
   playback.load(state.scenario.frames);
   el.description.textContent = state.scenario.description;
+  el.title.textContent = state.scenario.title;
   el.timeline.min = playback.start;
   el.timeline.max = playback.end;
   el.marks.innerHTML = state.scenario.frames
@@ -299,25 +314,49 @@ function render() {
 
 // ---- modes --------------------------------------------------------------
 
+const MODES = ['analyse', 'train', 'progress'];
+
 function setMode(mode) {
   if (state.mode === mode) return;
+  const before = state.mode;
   state.mode = mode;
   document.body.classList.toggle('train-mode', mode === 'train');
-  for (const [id, m] of [['tab-analyse', 'analyse'], ['tab-train', 'train']]) {
-    $(id).classList.toggle('on', m === mode);
-    $(id).setAttribute('aria-selected', String(m === mode));
+  document.body.classList.toggle('progress-mode', mode === 'progress');
+  $('train-view').hidden = mode !== 'train';
+  $('progress-view').hidden = mode !== 'progress';
+  for (const m of MODES) {
+    $(`tab-${m}`).classList.toggle('on', m === mode);
+    $(`tab-${m}`).setAttribute('aria-selected', String(m === mode));
   }
+  if (before === 'train') training.exit();
+  if (before === 'progress') training.exitProgress();
   if (mode === 'train') {
     playback.pause();
     training.enter();
+  } else if (mode === 'progress') {
+    playback.pause();
+    training.enterProgress();
   } else {
-    training.exit();
+    view.resize(); // the pitch may have been resized while hidden
     render();
   }
+  updateAvatar();
+  window.scrollTo(0, 0);
 }
 
-$('tab-analyse').addEventListener('click', () => setMode('analyse'));
-$('tab-train').addEventListener('click', () => setMode('train'));
+for (const m of MODES) $(`tab-${m}`).addEventListener('click', () => setMode(m));
+
+/** The round avatar: the current player's initial, or "?" before anyone is picked. */
+function updateAvatar() {
+  const p = profiles.currentProfile();
+  el.avatar.textContent = p ? p.name.charAt(0).toUpperCase() : '?';
+  el.avatar.title = p ? `Playing as ${p.name}. Click to switch player.` : "Who's playing?";
+  el.avatar.setAttribute('aria-label', el.avatar.title);
+}
+
+el.avatar.addEventListener('click', () => {
+  if (training.askWho()) setMode('train');
+});
 
 // ---- drawing ------------------------------------------------------------
 
@@ -328,7 +367,7 @@ function loop(now) {
   if (state.mode === 'train') {
     training.tick(dt);
     training.draw(now);
-  } else {
+  } else if (state.mode === 'analyse') {
     playback.tick(dt);
     draw(now);
     drawPov();
@@ -362,7 +401,7 @@ function draw(now) {
       heatmap: el.heatmap.checked,
     });
     const me = positions.get(sel.geometry.selected.id);
-    if (sel.call?.choice && me) drawDecision(view, sel.call.choice, sel.geometry, me, positions, '#ffffff');
+    if (sel.call?.choice && me) drawDecision(view, sel.call.choice, sel.geometry, me, positions, COLORS.ink);
     if (isOffBall(sel.geometry)) {
       // Off the ball: only the runner and the passer matter on screen.
       focusIds = new Set([sel.player.id, sel.geometry.space_value.best_position.pass_from]);
@@ -444,13 +483,13 @@ function povMarks(me) {
   if (isOffBall(g)) {
     const best = g.space_value.best_position;
     if (best.pass_from != null) highlights.set(best.pass_from, { color: COLORS.open, label: `passer #${best.pass_from}` });
-    if (best.run_m >= 2) spots.push({ x: best.x, y: best.y, color: '#f5c542', label: 'move here' });
+    if (best.run_m >= 2) spots.push({ x: best.x, y: best.y, color: '#f5b301', label: 'move here' });
   } else {
     for (const id of g.open_teammates) highlights.set(id, { color: COLORS.open, label: `#${id} open` });
   }
   const decision = sel.analysis?.stages.find((s) => s.key === 'decision')?.data;
   if (decision?.action === 'pass' && decision.target_player_id != null && !isOffBall(g)) {
-    highlights.set(decision.target_player_id, { color: '#f5c542', label: `PASS → #${decision.target_player_id}`, target: true });
+    highlights.set(decision.target_player_id, { color: '#f5b301', label: `PASS → #${decision.target_player_id}`, target: true });
   }
   return { highlights, spots };
 }
@@ -574,7 +613,8 @@ document.addEventListener('keydown', (e) => {
 });
 
 window.addEventListener('resize', () => {
-  view.resize();
+  if (state.mode === 'analyse') view.resize();
+  training.resize();
   if (state.pov.on) resizePov();
 });
 

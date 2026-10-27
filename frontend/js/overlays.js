@@ -40,7 +40,7 @@ function drawHeatmap(view, heatmap) {
       const v = values[r * cols + c] / max;
       if (v < 0.08) continue;
       const [x, y] = view.m((c * 105) / cols, (r * 68) / rows);
-      ctx.fillStyle = `rgba(245, 197, 66, ${(v * 0.55).toFixed(3)})`;
+      ctx.fillStyle = `rgba(245, 179, 1, ${(v * 0.55).toFixed(3)})`;
       ctx.fillRect(x, y, cellW + 0.5, cellH + 0.5);
     }
   }
@@ -64,7 +64,7 @@ function drawBestPosition(view, best, me, positions, now) {
   ctx.arc(tx, ty, view.playerRadius + 4 + pulse * 4, 0, Math.PI * 2);
   ctx.stroke();
   ctx.fillStyle = COLORS.accent;
-  ctx.font = '700 12px Inter, system-ui, sans-serif';
+  ctx.font = '700 12px "DM Sans", system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   ctx.fillText(best.run_m >= 2 ? (best.available_here ? 'move here' : 'get free here') : 'hold', tx, ty - view.playerRadius - 10);
@@ -78,9 +78,11 @@ export function drawDecision(view, decision, geometry, me, positions, color = CO
   else if (decision.action === 'shoot') to = { x: geometry.attacking === 'right' ? 100 : 0, y: 50 };
   if (!to) return;
   const { ctx } = view;
-  ctx.shadowColor = color === COLORS.accent ? 'rgba(245, 197, 66, 0.8)' : 'rgba(255, 255, 255, 0.5)';
-  ctx.shadowBlur = 12;
-  arrow(view, me, to, { color, width: color === COLORS.accent ? 5 : 3, dash: decision.action === 'dribble' ? [10, 6] : [] }, true);
+  // Best: bold gold with a glow. Anything else ("your pick"): an ink dashed line.
+  const best = color === COLORS.accent;
+  ctx.shadowColor = best ? 'rgba(245, 179, 1, 0.7)' : 'rgba(255, 255, 255, 0.6)';
+  ctx.shadowBlur = best ? 12 : 4;
+  arrow(view, me, to, { color, width: best ? 5 : 3, dash: best && decision.action !== 'dribble' ? [] : [10, 6] }, true);
   ctx.shadowBlur = 0;
 }
 
@@ -100,7 +102,7 @@ function drawFreeSpace(view, space, now) {
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.fillStyle = COLORS.space;
-  ctx.font = '600 12px Inter, system-ui, sans-serif';
+  ctx.font = '600 12px "DM Sans", system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('space', x, y);
@@ -117,9 +119,9 @@ function drawTriangles(view, triangles, positions) {
       i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
     });
     ctx.closePath();
-    ctx.fillStyle = rank === 0 ? 'rgba(245, 197, 66, 0.22)' : 'rgba(245, 197, 66, 0.1)';
+    ctx.fillStyle = rank === 0 ? 'rgba(245, 179, 1, 0.22)' : 'rgba(245, 179, 1, 0.1)';
     ctx.fill();
-    ctx.strokeStyle = rank === 0 ? COLORS.accent : 'rgba(245, 197, 66, 0.5)';
+    ctx.strokeStyle = rank === 0 ? COLORS.accent : 'rgba(245, 179, 1, 0.5)';
     ctx.lineWidth = rank === 0 ? 2 : 1.5;
     ctx.setLineDash([3, 4]);
     ctx.stroke();
@@ -202,13 +204,13 @@ export function drawMissed(view, missed, positions) {
   const { ctx } = view;
   ctx.lineWidth = 2.5;
   ctx.setLineDash([5, 4]);
-  ctx.font = '700 11px Inter, system-ui, sans-serif';
+  ctx.font = '700 11px "DM Sans", system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   for (const m of missed) {
     const p = positions.get(m.id);
     if (!p) continue;
-    const color = m.noticed ? COLORS.marked : COLORS.blocked;
+    const color = m.noticed ? '#f59e0b' : '#c2410c';
     const [x, y] = view.toPx(p.x, p.y);
     const r = view.playerRadius + 7;
     ctx.strokeStyle = color;
