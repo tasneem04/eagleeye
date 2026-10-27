@@ -16,7 +16,7 @@
     "away": "left"
   },
   "key_frame": 3,
-  "moment_titles": ["Build-up from the back", "Into midfield", "#6 receives", "Find the free man", "Pass to #8", "#8 turns", "Out to the wing", "#7 on the right"],
+  "moments": [{"frame": 0, "title": "You start the attack", "note": "You're #4 at the back with the ball. Look, then pick the pass that starts the build-up."}, {"frame": 2, "title": "You receive the ball", "note": "#4 passes to you. Pause, look, and pick the best pass."}, {"frame": 3, "title": "They press you", "note": "Red's strikers close in and the pass into #10 is cut off. Where is the free option?"}, {"frame": 5, "title": "You turn in midfield", "note": "#6 finds you. Pick the pass that moves the attack on."}, {"frame": 7, "title": "You're on the wing", "note": "The ball reaches you on the right. Pass, dribble or shoot?"}],
   "match_situation": {
     "minute": 63,
     "score": {

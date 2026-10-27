@@ -3,12 +3,54 @@
 
 import { COLORS } from './pitch.js';
 
+/** A small pill over a player: "YOU" in ink, or the answer's "OPEN 6.2m" in gold. */
+export function drawPitchTag(view, p, text, kind) {
+  const { ctx } = view;
+  const [x, y] = view.toPx(p.x, p.y);
+  ctx.save();
+  ctx.font = '800 10px "DM Sans", system-ui, sans-serif';
+  const w = ctx.measureText(text).width + 14;
+  const h = 17;
+  const top = y - view.playerRadius - h - 6;
+  const left = kind === 'best' ? x + view.playerRadius + 4 : x - w / 2;
+  ctx.fillStyle = kind === 'best' ? COLORS.accent : COLORS.ink;
+  ctx.beginPath();
+  ctx.roundRect(left, kind === 'best' ? y - h / 2 : top, w, h, h / 2);
+  ctx.fill();
+  ctx.fillStyle = kind === 'best' ? '#3d2b00' : '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, left + w / 2, (kind === 'best' ? y : top + h / 2) + 0.5);
+  ctx.restore();
+}
+
+/** Where to look: a soft white cone from you towards the answer's receiver. */
+export function drawLookCone(view, me, to) {
+  const { ctx } = view;
+  const [x, y] = view.toPx(me.x, me.y);
+  const [tx, ty] = view.toPx(to.x, to.y);
+  const a = Math.atan2(ty - y, tx - x);
+  const r = Math.hypot(tx - x, ty - y) * 1.15;
+  const half = 0.32;
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, 'rgba(255, 255, 255, 0.42)');
+  g.addColorStop(1, 'rgba(255, 255, 255, 0.04)');
+  ctx.save();
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.arc(x, y, r, a - half, a + half);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
 /** Off the ball with a suggested run: show only "where should I be?". */
 export function isOffBall(geometry) {
   return !geometry.selected.has_ball && Boolean(geometry.space_value?.best_position);
 }
 
-export function drawOverlays(view, geometry, positions, now, { decision = null, heatmap = false } = {}) {
+export function drawOverlays(view, geometry, positions, now, { decision = null, heatmap = false, simple = false } = {}) {
   const me = positions.get(geometry.selected.id);
   if (!me) return;
   const { ctx } = view;
@@ -16,6 +58,10 @@ export function drawOverlays(view, geometry, positions, now, { decision = null, 
   if (heatmap) drawHeatmap(view, geometry.space_value.heatmap);
   if (isOffBall(geometry)) {
     drawBestPosition(view, geometry.space_value.best_position, me, positions, now);
+  } else if (simple) {
+    // The clean picture: only the forward passes that are closed (dashed), then the answer.
+    drawLanes(view, geometry.teammates.filter((o) => !o.open && o.forward_m > 0), me, positions);
+    if (decision) drawDecision(view, decision, geometry, me, positions);
   } else {
     drawFreeSpace(view, geometry.free_space, now);
     drawTriangles(view, geometry.triangles, positions);

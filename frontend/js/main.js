@@ -1,6 +1,6 @@
 import * as api from './api.js';
-import { drawDecision, drawOverlays, isOffBall } from './overlays.js';
-import { loadDone, markDone, momentsHtml, momentTitle, nextMoment } from './moments.js';
+import { drawDecision, drawLookCone, drawOverlays, drawPitchTag, isOffBall } from './overlays.js';
+import { buildMoments, isUnlocked, loadDone, markDone, sidebarHtml } from './moments.js';
 import { agentInitials, explanationText, renderPanel } from './panel.js';
 import { COLORS, PitchView } from './pitch.js';
 import { Playback } from './playback.js';
@@ -23,6 +23,7 @@ const el = {
   kicker: $('scenario-kicker'),
   moments: $('moments-col'),
   pick: $('pick-card'),
+  search: $('moment-search'),
   avatar: $('avatar'),
   badge: $('mode-badge'),
   knowledge: $('knowledge-badge'),
@@ -62,8 +63,10 @@ const state = {
   situation: null,
   selection: null,
   requestId: 0,
-  momentNow: -1,      // the moment the timeline is at (index into the frames)
-  done: new Set(),    // moments where a player was opened
+  moments: [],        // the moments where YOU (a Blue player) have the ball
+  moment: 0,          // the open moment
+  done: new Set(),    // moments where you made your pick (each one unlocks the next)
+  search: '',
   // Player's view: follows one player through the timeline, even after the
   // selection is cleared by playing or stepping.
   pov: { on: false, playerId: null, team: null, yawOffset: 0 },
@@ -87,7 +90,6 @@ async function init() {
       : 'Offline mode';
     el.badge.title = state.config.stages.map((s) => `${s.step}. ${s.agent}: ${s.title}`).join('\n');
     el.badge.className = `badge ${state.config.mode}`;
-    showStartHere();
     refreshKnowledge();
 
     const scenarios = await api.listScenarios();
@@ -111,8 +113,6 @@ async function init() {
 async function loadScenario(id) {
   state.scenario = await api.getScenario(id);
   playback.load(state.scenario.frames);
-  el.description.textContent = state.scenario.description;
-  el.title.textContent = state.scenario.title;
   el.timeline.min = playback.start;
   el.timeline.max = playback.end;
   el.marks.innerHTML = state.scenario.frames
@@ -127,11 +127,14 @@ async function loadScenario(id) {
   el.situationSelect.innerHTML = state.situations
     .map((s, i) => `<option value="${i}">${situationLabel(s)}${i === 0 ? ' (scenario)' : ''}</option>`)
     .join('');
+  state.moments = buildMoments(state.scenario);
   state.done = loadDone(id);
-  state.momentNow = -1;
   setSituation(0);
   state.pov.playerId = null;
-  clearSelection();
+  // Open the moment from the link (#moment-3), else the first one not done yet.
+  const linked = Number(location.hash.match(/^#moment-(\d+)$/)?.[1]) - 1;
+  const first = Math.max(0, state.moments.findIndex((_, i) => !state.done.has(i)));
+  if (!(linked >= 0 && openMoment(linked))) openMoment(first);
 }
 
 function situationLabel(s) {
@@ -145,7 +148,7 @@ function setSituation(index) {
   state.situation = state.situations[index];
   const { teams } = state.scenario;
   const { score, minute } = state.situation;
-  if (state.momentNow >= 0) renderMoments();
+  if (state.moments.length) renderMoments();
   el.scoreboard.innerHTML = `
     <span class="team-home">${teams.home.name.toUpperCase()}</span>
     <span>${score.home} – ${score.away}</span>
@@ -162,8 +165,6 @@ async function select(player, frameIndex) {
     situation: state.situation,
   };
   state.selection = { player, frameIndex, geometry: null, analysis: null, error: null };
-  state.done = markDone(state.scenario.id, frameIndex);
-  renderMoments();
   if (state.pov.playerId !== player.id) state.pov.yawOffset = 0;
   state.pov.playerId = player.id;
   state.pov.team = player.team;
@@ -189,21 +190,6 @@ async function select(player, frameIndex) {
   }
   render();
 }
-
-// ---- first-visit guide ----------------------------------------------------
-
-const START_HERE_KEY = 'eagleeye.startHere.closed';
-
-function showStartHere() {
-  let closed = false;
-  try { closed = localStorage.getItem(START_HERE_KEY) === '1'; } catch { /* storage blocked: show it */ }
-  $('start-here').hidden = closed;
-}
-
-$('start-here-close').addEventListener('click', () => {
-  $('start-here').hidden = true;
-  try { localStorage.setItem(START_HERE_KEY, '1'); } catch { /* fine: it just shows again next visit */ }
-});
 
 // ---- coaching knowledge (changes only through approved KnowledgeScout research) ----
 
@@ -281,7 +267,10 @@ function onCall(action) {
     return;
   }
   sel.replay = null;
-  if (action === 'skip') sel.call = { asking: false, revealed: true, choice: null };
+  if (action === 'skip') {
+    sel.call = { asking: false, revealed: true, choice: null };
+    finishMoment();
+  }
   else if (action === 'again') sel.call = { asking: true, revealed: true, choice: null };
   else makeChoice({ action });
   render();
@@ -290,6 +279,7 @@ function onCall(action) {
 function makeChoice(choice) {
   const sel = state.selection;
   sel.call = { asking: false, revealed: true, choice };
+  finishMoment();
   render();
   playReplay(choice, 'yours');
 }
@@ -325,45 +315,87 @@ function render() {
   renderPick();
 }
 
-// ---- moments: the match as a playlist (no locks) -----------------------------
-
-function syncMoment() {
-  const i = playback.nearestKeyframe();
-  if (i !== state.momentNow) {
-    state.momentNow = i;
-    renderMoments();
-  }
-}
+// ---- moments: the match as a playlist. You are the player on the ball; each pick unlocks the next ----
 
 function renderMoments() {
   const sc = state.scenario;
-  const i = Math.max(0, state.momentNow);
-  el.moments.innerHTML = momentsHtml(sc, i, state.done);
-  el.title.textContent = momentTitle(sc, i);
-  el.kicker.textContent = `${sc.title} · Moment ${i + 1} of ${sc.frames.length}${state.situation ? ` · ${state.situation.minute}'` : ''}`;
+  const m = state.moments[state.moment];
+  const minute = state.situation?.minute ?? sc.match_situation.minute;
+  el.moments.innerHTML = sidebarHtml(sc, state.moments, state.moment, state.done, minute, state.search);
+  el.kicker.textContent = `Moment ${state.moment + 1} of ${state.moments.length} · ${minute}'`;
+  el.title.textContent = m.title;
+  el.description.textContent = m.note || sc.description;
 }
 
-function jumpTo(index) {
-  changeTime(() => {
-    playback.pause();
-    playback.seekToFrame(index);
-  });
+/** Open a moment (if unlocked): pause there and make the Blue player on the ball "you". */
+function openMoment(index) {
+  const m = state.moments[index];
+  if (!m || !isUnlocked(index, state.moments, state.done)) return false;
+  state.moment = index;
+  playback.pause();
+  playback.seekToFrame(m.frame);
+  renderMoments();
+  history.replaceState(null, '', `#moment-${index + 1}`);
+  const you = state.scenario.frames[m.frame].players.find((p) => p.id === m.you);
+  if (you) select(you, m.frame);
+  return true;
+}
+
+/** A pick made as "you" at the open moment finishes it, which unlocks the next one. */
+function finishMoment() {
+  const sel = state.selection;
+  const m = state.moments[state.moment];
+  if (!sel || !m || sel.frameIndex !== m.frame || sel.player.id !== m.you) return;
+  state.done = markDone(state.scenario.id, state.moment);
+  renderMoments();
+}
+
+function continueIndex() {
+  const n = state.moments.length;
+  for (let k = 1; k <= n; k++) {
+    const i = (state.moment + k) % n;
+    if (!state.done.has(i) && isUnlocked(i, state.moments, state.done)) return i;
+  }
+  return (state.moment + 1) % n;
+}
+
+function nudgeLock() {
+  const note = el.moments.querySelector('.lock-note');
+  if (!note) return;
+  note.classList.remove('nudge');
+  void note.offsetWidth; // restart the animation
+  note.classList.add('nudge');
 }
 
 el.moments.addEventListener('click', (e) => {
   if (!state.scenario) return;
   const action = e.target.closest('[data-moment]')?.dataset.moment;
   const row = e.target.closest('[data-moment-row]');
-  if (action === 'continue') jumpTo(nextMoment(state.scenario, state.momentNow, state.done));
+  if (action === 'continue') openMoment(continueIndex());
   else if (action === 'replay') changeTime(() => { playback.seek(playback.start); playback.play(); });
-  else if (row) jumpTo(Number(row.dataset.momentRow));
+  else if (row && !openMoment(Number(row.dataset.momentRow))) nudgeLock();
 });
 el.moments.addEventListener('keydown', (e) => {
   const row = e.target.closest('[data-moment-row]');
   if (row && (e.key === 'Enter' || e.key === ' ')) {
     e.preventDefault();
-    jumpTo(Number(row.dataset.momentRow));
+    if (!openMoment(Number(row.dataset.momentRow))) nudgeLock();
   }
+});
+
+// "Search moments…": matching moments stay bright; Enter opens the first open one.
+el.search.addEventListener('input', () => {
+  state.search = el.search.value;
+  if (state.mode !== 'analyse') setMode('analyse');
+  if (state.moments.length) renderMoments();
+});
+el.search.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const q = el.search.value.trim().toLowerCase();
+  const hits = state.moments.map((m, i) => i).filter((i) => state.moments[i].title.toLowerCase().includes(q));
+  const open = hits.find((i) => isUnlocked(i, state.moments, state.done));
+  if (open != null) openMoment(open);
+  else if (hits.length) nudgeLock();
 });
 
 // ---- "Your pick": options under the pitch for the player on the ball -----------
@@ -382,27 +414,24 @@ function renderPick() {
   const g = sel?.geometry;
   let body;
   if (!sel) {
-    body = '<p class="sub">Pause and click a Blue player. If they have the ball, you make your pick first, then see the agents&rsquo; answer.</p>';
+    body = '<p class="sub">Choose a moment on the left: you will be the Blue player on the ball.</p>';
   } else if (!g) {
     body = '<div class="loading"><span class="spinner"></span>Reading the pitch…</div>';
   } else if (!sel.call) {
-    body = `<p class="sub">#${sel.player.id} doesn't have the ball: the answer on the right shows where to be and what to do if it comes.</p>`;
+    body = `<p class="sub">#${sel.player.id} doesn't have the ball: the answer on the right shows where to be. Open a moment on the left to be the player on the ball again.</p>`;
   } else {
-    // The three nearest teammates (a neutral order, so the list doesn't give the answer away), then dribble and shoot.
-    const mates = g.teammates
-      .filter((o) => o.role !== 'goalkeeper')
-      .sort((a, b) => a.distance_m - b.distance_m)
-      .slice(0, 3)
-      .map((o) => ({ key: `pass:${o.id}`, label: `Pass to #${o.id}`, choice: { action: 'pass', target_player_id: o.id } }));
-    const options = [...mates,
-      { key: 'dribble', label: 'Dribble', choice: { action: 'dribble' } },
-      { key: 'shoot', label: 'Shoot', choice: { action: 'shoot' } }];
+    // The nearest teammates ahead and behind (a neutral order, so the list never gives the answer away).
+    const pass = (o, label) => ({ key: `pass:${o.id}`, label, choice: { action: 'pass', target_player_id: o.id } });
+    const mates = g.teammates.filter((o) => o.role !== 'goalkeeper').sort((a, b) => a.distance_m - b.distance_m);
+    const ahead = mates.filter((o) => o.forward_m > 0).slice(0, 2).map((o) => pass(o, `Pass to #${o.id}`));
+    const back = mates.filter((o) => o.forward_m <= 0).slice(0, 1).map((o) => pass(o, `Back to #${o.id}`));
+    const options = [...ahead, { key: 'dribble', label: 'Dribble', choice: { action: 'dribble' } }, ...back];
+    if (g.shot?.distance_m < 25) options.push({ key: 'shoot', label: 'Shoot', choice: { action: 'shoot' } });
     const mine = sel.call.choice;
     const isMine = (c) => mine && mine.action === c.action && (c.action !== 'pass' || mine.target_player_id === c.target_player_id);
     body = `<div class="picks">${options.map((o, i) => `
       <button class="pick${isMine(o.choice) ? ' on' : ''}" data-pick="${o.key}">
-        <span class="letter">${isMine(o.choice) ? '✓' : String.fromCharCode(65 + i)}</span>${o.label}</button>`).join('')}</div>
-      <p class="sub pick-note">Or click any teammate on the pitch.</p>`;
+        <span class="letter">${isMine(o.choice) ? '✓' : String.fromCharCode(65 + i)}</span>${o.label}</button>`).join('')}</div>`;
   }
   el.pick.innerHTML = `<div class="answer-label">Your pick</div>${body}${agentDots()}`;
 }
@@ -471,7 +500,6 @@ function loop(now) {
     training.draw(now);
   } else if (state.mode === 'analyse') {
     playback.tick(dt);
-    syncMoment();
     draw(now);
     drawPov();
     syncControls();
@@ -484,7 +512,6 @@ function draw(now) {
   const { players, ball } = playback.current();
   view.begin();
   view.drawPitch();
-  view.drawSides(analyseSides());
   const sel = state.selection;
   if (sel?.replay?.data) {
     // "What happens next": the replay replaces the frozen moment until "Back to the moment".
@@ -495,6 +522,7 @@ function draw(now) {
     return;
   }
   let focusIds = null;
+  const tags = [];
   const hideAnswer = sel?.call && !sel.call.revealed; // no lanes or arrows until the player has chosen
   if (sel?.geometry && !hideAnswer) {
     const decision = sel.analysis?.stages.find((s) => s.key === 'decision')?.data ?? null;
@@ -502,9 +530,20 @@ function draw(now) {
     drawOverlays(view, sel.geometry, positions, now, {
       decision,
       heatmap: el.heatmap.checked,
+      simple: true,
     });
     const me = positions.get(sel.geometry.selected.id);
-    if (sel.call?.choice && me) drawDecision(view, sel.call.choice, sel.geometry, me, positions, COLORS.ink);
+    // Where to look: a soft cone towards the answer's receiver, who gets an "OPEN" tag with his room.
+    const target = decision?.action === 'pass' ? sel.geometry.teammates.find((o) => o.id === decision.target_player_id) : null;
+    const to = target && positions.get(target.id);
+    if (me && to) {
+      drawLookCone(view, me, to);
+      tags.push([to, `OPEN ${target.receiver_space_m.toFixed(1)}m`, 'best']);
+    }
+    const mine = sel.call?.choice;
+    const sameAsBest = mine && decision && mine.action === decision.action
+      && (mine.action !== 'pass' || mine.target_player_id === decision.target_player_id);
+    if (mine && me && !sameAsBest) drawDecision(view, mine, sel.geometry, me, positions, COLORS.ink);
     if (isOffBall(sel.geometry)) {
       // Off the ball: only the runner and the passer matter on screen.
       focusIds = new Set([sel.player.id, sel.geometry.space_value.best_position.pass_from]);
@@ -512,18 +551,9 @@ function draw(now) {
   }
   view.drawPlayers(players, { selectedId: sel?.player.id ?? (state.pov.on ? state.pov.playerId : null), focusIds });
   view.drawBall(ball);
-}
-
-/** Which goal belongs to which team, and which way Blue attacks. */
-function analyseSides() {
-  const { teams, attacking_direction: dir } = state.scenario;
-  const homeOnLeft = dir.home === 'right';
-  const goal = (team) => ({ text: `${teams[team].name.toUpperCase()} GOAL`, color: COLORS[team] });
-  return {
-    left: goal(homeOnLeft ? 'home' : 'away'),
-    right: goal(homeOnLeft ? 'away' : 'home'),
-    arrow: { text: `${teams.home.name.toUpperCase()} ATTACKS`, dir: dir.home, color: COLORS.home },
-  };
+  const you = sel && players.find((p) => p.id === sel.player.id);
+  if (you) drawPitchTag(view, you, 'YOU', 'you');
+  for (const [p, text, kind] of tags) drawPitchTag(view, p, text, kind);
 }
 
 function syncControls() {

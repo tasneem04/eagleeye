@@ -1,38 +1,44 @@
-// Side panel: the answer first (the move, the coach's words, where to look), then
-// "See how the agents decided": what the geometry engine found and each Foundry
-// agent's output in chain order, one click away for anyone who wants the details.
+// Side panel: EagleEye's answer (the move, why, where to look, the measured facts), then one line
+// from each Foundry agent. Below: your pick next to the best one, what happens next, "did you
+// understand?", and "See how the agents decided" with every agent's full output.
 
 let howOpen = false; // keep the details open across re-renders once the player opened them
+
+const AGENT_COLOURS = { field_mapper: '#be123c', tactical_context: '#2563eb', decision: '#c2410c', coach: '#1d1416' };
+const AGENT_LABELS = { field_mapper: 'Formation', tactical_context: 'Tactics', decision: 'Decision', coach: 'Coach' };
+const ICONS = {
+  eye: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  lane: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 20L11 4M16 20L13 4"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2"/></svg>',
+  people: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 19c0-3 3-5 6-5s6 2 6 5"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14c3 0 5 2 5 4.5"/></svg>',
+  goal: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18V7h18v11"/><path d="M7 7v11M12 7v11M17 7v11"/></svg>',
+};
 
 export function renderPanel(panel, { config, scenario, selection }) {
   if (!selection) {
     panel.innerHTML = `
-      <div class="card empty">
-        <strong>Train your eagle eye</strong>
-        Press play to watch the move. Pause at any moment and click a Blue player:
-        EagleEye shows the best move, why, and where to look first.
+      <div class="card answer">
+        <div class="answer-label">EagleEye's answer</div>
+        <p class="answer-why">Open a moment on the left. You are the Blue player on the ball: make your pick, then see what the agents read.</p>
       </div>`;
     return;
   }
-
-  const player = selection.player;
-  const teamName = scenario.teams[player.team].name;
   const call = selection.call;
   if (call && !call.revealed) {
-    // "Your call first": nothing that gives the answer away until the player has chosen.
-    panel.innerHTML = playerCard(player, teamName, selection) + askCard(call);
+    // Your pick first: nothing that gives the answer away until you have chosen.
+    panel.innerHTML = pendingCard(config, selection) + agentsReadCard(config, selection, true);
     return;
   }
   panel.innerHTML = [
-    playerCard(player, teamName, selection),
-    call?.asking ? askCard(call) : '',
+    answerCard(config, selection, scenario),
+    agentsReadCard(config, selection, false),
     call?.choice ? verdictCard(call.choice, selection) : '',
-    answerCard(config, selection),
-    agentsReadCard(config, selection),
+    call?.asking ? askCard(call) : '',
     selection.analysis ? clarityCard(selection.clarity) : '',
     `<details class="how"${howOpen ? ' open' : ''}>
       <summary>See how the agents decided</summary>
       <div class="how-body">
+        ${playerCard(selection.player, scenario.teams[selection.player.team].name, selection)}
         ${geometryCard(selection.geometry)}
         ${agentCards(config, selection).join('')}
       </div>
@@ -41,8 +47,24 @@ export function renderPanel(panel, { config, scenario, selection }) {
   panel.querySelector('details.how')?.addEventListener('toggle', (e) => { howOpen = e.target.open; });
 }
 
-/** The short answer a player reads first: the move, the coach's explanation and where to look. */
-function answerCard(config, selection) {
+/** Before your pick: the answer stays hidden while the agents work. */
+function pendingCard(config, selection) {
+  const agents = config.stages.length;
+  const ready = Boolean(selection.analysis);
+  return `
+    <div class="card answer pending">
+      <div class="answer-label">EagleEye's answer</div>
+      <div class="answer-move pending-move">Your pick first</div>
+      <p class="answer-why">You are #${selection.player.id} with the ball. Choose an option under the pitch, or click a teammate on it.</p>
+      <div class="scan-tip">${ICONS.eye}<span>${ready
+        ? 'The answer is ready: it opens as soon as you pick.'
+        : `${agents} Microsoft Foundry agent${agents === 1 ? ' is' : 's are'} reading this moment while you think.`}</span></div>
+      <button class="link-btn" data-call="skip">Skip: just show me</button>
+    </div>`;
+}
+
+/** The answer a player reads first: the move, why, where to look, and the measured facts. */
+function answerCard(config, selection, scenario) {
   const g = selection.geometry;
   if (selection.error) return `<div class="card answer"><div class="warning">${esc(selection.error)}</div></div>`;
   if (!config.stages.length) return '';
@@ -51,64 +73,62 @@ function answerCard(config, selection) {
     const agents = config.stages.length;
     return `
       <div class="card answer">
+        <div class="answer-label">EagleEye's answer</div>
         <div class="loading"><span class="spinner"></span>${agents} Microsoft Foundry agent${agents === 1 ? ' is' : 's are'} reading this moment…</div>
         <div class="sub">The first look at a moment takes about 20 seconds. After that it is instant.</div>
       </div>`;
   }
-
   const stages = Object.fromEntries(analysis.stages.map((s) => [s.key, s]));
   const d = stages.decision?.data;
-  const coach = stages.coach?.output || d?.reason || '';
+  const why = d?.reason || stages.coach?.output || '';
   const advice = stages.tactical_context?.data?.position_advice || g?.space_value?.best_position?.direction_text;
   let move;
   if (offBall(g)) {
-    move = `<div class="answer-move">MOVE<span class="answer-target">${esc(advice || 'hold your position')}</span></div>
-       ${d ? `<div class="sub">If the ball comes to you: ${esc(moveText(d))}</div>` : ''}`;
+    move = `<div class="answer-move">Move<span class="answer-target">${esc(advice || 'hold your position')}</span></div>`;
   } else if (g && !g.selected.has_ball) {
     move = `<div class="sub">If the ball comes to you</div><div class="answer-move">${esc(moveText(d))}</div>`;
   } else {
     move = `<div class="answer-move">${esc(moveText(d))}</div>`;
   }
+  const facts = answerFacts(d, g, scenario);
   const live = analysis.stages.every((s) => s.source === 'foundry');
-  const timing = analysis.cached ? 'instant (saved answer)' : `${(analysis.total_ms / 1000).toFixed(1)} s`;
-  const facts = answerFacts(d, g);
   return `
     <div class="card answer">
       <div class="answer-label">EagleEye's answer</div>
       ${move}
-      ${coach ? `<p class="answer-why">${esc(coach)}</p>` : ''}
-      ${d?.scan_cue ? `<p class="scan-cue"><span>Scan tip</span>${esc(d.scan_cue)}</p>` : ''}
-      ${facts.length ? `<div class="chips">${facts.map((f) => `<span class="chip">${esc(f)}</span>`).join('')}</div>` : ''}
-      <div class="agent-meta">
-        <span>${live ? `${analysis.stages.length} Microsoft Foundry agents` : 'Offline text (agents unavailable)'}</span>
-        <span>${timing}</span>
-      </div>
+      ${why ? `<p class="answer-why">${esc(firstSentences(why, 200))}</p>` : ''}
+      ${d?.scan_cue ? `<div class="scan-tip">${ICONS.eye}<span><strong>Scan tip:</strong> ${esc(d.scan_cue)}</span></div>` : ''}
+      ${facts.length ? `<div class="fact-chips">${facts.map(([icon, text]) => `<span class="fact">${ICONS[icon]}${esc(text)}</span>`).join('')}</div>` : ''}
+      ${live ? '' : '<p class="sub">Offline text: the agents were not available.</p>'}
     </div>`;
 }
 
-/** Measured facts behind the answer, as chips: the pass, the room, the opponents close by. */
-function answerFacts(d, g) {
+/** Measured facts behind the answer, as chips: the room, the time you have, the opponents close by. */
+function answerFacts(d, g, scenario) {
   if (!d || !g) return [];
   const facts = [];
   if (d.action === 'pass') {
     const t = g.teammates.find((o) => o.id === d.target_player_id);
-    if (t) facts.push(`${Math.round(t.distance_m)} m pass`, `${Math.round(t.receiver_space_m)} m of room`, t.lane_open ? 'lane open' : 'lane tight');
+    if (t) facts.push(['lane', `${t.receiver_space_m.toFixed(1)} m free`]);
   } else if (d.action === 'dribble') {
-    facts.push(`${Math.round(g.free_space?.space_m ?? 0)} m of free space`);
+    facts.push(['lane', `${Math.round(g.free_space?.space_m ?? 0)} m of space`]);
   } else if (d.action === 'shoot' && g.shot) {
-    facts.push(`${Math.round(g.shot.distance_m)} m out`, `${chanceText(g.shot.xg)} chance`);
+    facts.push(['goal', `${chanceText(g.shot.xg)} to score`]);
   }
+  // Time on the ball: how long the nearest opponent needs to reach you (running at about 7 m/s).
+  const nearest = g.pressure?.nearest_opponents?.[0];
+  if (nearest) facts.push(['clock', `${(nearest.distance_m / 7).toFixed(1)} s to decide`]);
   const near = (g.pressure?.nearest_opponents ?? []).filter((o) => o.distance_m < 10).length;
-  facts.push(near ? `${near} opponent${near === 1 ? '' : 's'} within 10 m` : 'no opponent within 10 m');
+  const theirs = scenario?.teams?.[g.selected.team === 'home' ? 'away' : 'home']?.name ?? 'opponent';
+  facts.push(['people', near ? `${near} ${theirs}${near === 1 ? '' : 's'} near` : `no ${theirs}s near`]);
   return facts;
 }
 
-/** "How the agents read it": one line from each Foundry agent, in chain order. The full cards stay below. */
-function agentsReadCard(config, selection) {
-  const stages = selection.analysis?.stages;
-  if (!stages?.length || selection.error) return '';
-  const colours = { field_mapper: '#be123c', tactical_context: '#2563eb', decision: '#c2410c', coach: '#1d1416' };
-  const labels = { field_mapper: 'The picture', tactical_context: 'Tactics', decision: 'Decision', coach: 'Coach' };
+/** "How the agents read it": one line from each Foundry agent, in chain order. The full cards are below. */
+function agentsReadCard(config, selection, hidden) {
+  const stages = config.stages;
+  if (!stages.length || selection.error) return '';
+  const results = new Map((selection.analysis?.stages ?? []).map((s) => [s.key, s]));
   const line = (s) => {
     if (s.key === 'tactical_context' && s.data) {
       return `${capitalise(s.data.phase)}, ${s.data.mode === 'keep' ? 'keep the ball' : 'go forward'}${s.data.principles?.[0] ? `: ${s.data.principles[0]}` : ''}`;
@@ -116,10 +136,12 @@ function agentsReadCard(config, selection) {
     if (s.key === 'decision' && s.data) return `${moveText(s.data)}${s.data.reason ? `: ${s.data.reason}` : ''}`;
     return s.output;
   };
-  const rows = stages.map((s) => {
-    const agent = config.stages.find((c) => c.key === s.key)?.agent ?? s.key;
-    return `<li><span class="agent-dot" style="background:${colours[s.key] ?? '#6f6468'}" title="${esc(agent)}">${agentInitials(agent)}</span>
-      <p><strong>${labels[s.key] ?? esc(agent)}:</strong> ${esc(firstSentences(line(s)))}</p></li>`;
+  const rows = stages.map((c) => {
+    const r = results.get(c.key);
+    const text = hidden ? (r ? 'Ready. Shown after your pick.' : 'Reading the moment…')
+      : r ? firstSentences(line(r)) : 'Reading the moment…';
+    return `<li><span class="agent-dot" style="background:${AGENT_COLOURS[c.key] ?? '#6f6468'}" title="${esc(c.agent)}">${agentInitials(c.agent)}</span>
+      <p><strong>${AGENT_LABELS[c.key] ?? esc(c.agent)}:</strong> <span class="${hidden || !r ? 'muted' : ''}">${esc(text)}</span></p></li>`;
   }).join('');
   return `
     <div class="card agents-read">
@@ -136,12 +158,12 @@ export function agentInitials(name) {
 }
 
 /** Plain text, cut to the first sentence or two (at most about 170 characters). */
-function firstSentences(text) {
+function firstSentences(text, limit = 170) {
   const plain = String(text ?? '').replace(/\*\*|`/g, '').replace(/^\s*(?:[-*•]|\d+[.)])\s+/gm, '').replace(/\s+/g, ' ').trim();
   const sentences = plain.match(/[^.!?]+[.!?]+/g) ?? [plain];
   let out = sentences[0];
   if (out.length < 80 && sentences[1]) out += sentences[1];
-  return out.length > 170 ? `${out.slice(0, 167).trimEnd()}…` : out.trim();
+  return out.length > limit ? `${out.slice(0, limit - 3).trimEnd()}…` : out.trim();
 }
 
 /** "What would you do?": the player decides before seeing the agents' answer. */
@@ -151,7 +173,7 @@ function askCard(call) {
     <div class="card call">
       <div class="answer-label">${again ? 'Try another option' : 'Your call'}</div>
       <h3 class="call-question">${again ? 'What else could you do?' : 'You have the ball. What would you do?'}</h3>
-      <p class="sub">Pick an option under the pitch, or click a teammate on it.</p>
+      <p class="sub">Pick another option under the pitch, or click a teammate on it.</p>
       <div class="call-buttons">
         ${again ? '' : '<button class="link-btn" data-call="skip">Skip: just show me</button>'}
         <button class="link-btn" data-call="other">Look at another player</button>

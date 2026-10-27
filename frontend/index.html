@@ -27,6 +27,10 @@
       <button id="tab-train" class="tab" role="tab" aria-selected="false">Train</button>
       <button id="tab-progress" class="tab" role="tab" aria-selected="false">Progress</button>
     </nav>
+    <label class="nav-search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="moment-search" type="search" placeholder="Search moments…" aria-label="Search moments" autocomplete="off">
+    </label>
     <div class="topbar-right">
       <span id="knowledge-badge" class="badge knowledge" title="Coaching knowledge used by the agents (File Search). It changes only through KnowledgeScout research the coach approved."></span>
       <button id="scout-toggle" class="badge scout" type="button" aria-expanded="false" aria-controls="scout-panel" title="KnowledgeScout: background web research that grows the football reference. Proposals wait for your approval.">Scout</button>
@@ -37,101 +41,61 @@
   <aside id="scout-panel" class="scout-panel" hidden aria-label="KnowledgeScout proposals"></aside>
 
   <main class="layout" id="analyse-view">
-    <aside id="moments-col" class="moments-col" aria-label="The match's moments"></aside>
+    <aside id="moments-col" class="sidebar" aria-label="The match's moments"></aside>
+
     <section class="stage">
-      <div id="start-here" class="start-here" hidden>
-        <ol>
-          <li><span class="num">1</span>Press play, then pause where you like</li>
-          <li><span class="num">2</span>Click a Blue player</li>
-          <li><span class="num">3</span>See the best move and where to look first</li>
-          <li><span class="num">4</span><span>Then <strong>Train</strong>: after 3 drills EagleEye learns how you scan</span></li>
-        </ol>
-        <button id="start-here-close" class="close" type="button" aria-label="Hide this guide">×</button>
-      </div>
       <div class="page-head">
-        <div class="page-head-text">
-          <div class="kicker" id="scenario-kicker">Your match · Blue v Red</div>
-          <h1 id="scenario-title" class="page-title">Analyse</h1>
-          <p id="scenario-description" class="scenario-description"></p>
-        </div>
-        <div class="head-selects">
-          <label class="select-field">
-            <span>Scenario</span>
-            <select id="scenario-select"></select>
-          </label>
-          <label class="select-field">
-            <span>Match situation</span>
-            <select id="situation-select"></select>
-          </label>
-        </div>
+        <div class="kicker" id="scenario-kicker">Your match · Blue v Red</div>
+        <h1 id="scenario-title" class="page-title">Analyse</h1>
+        <p id="scenario-description" class="scenario-description"></p>
       </div>
 
-      <div class="pitch-card">
-        <div class="pitch-wrap" id="pitch-wrap">
-          <canvas id="pitch" aria-label="Bird's-eye view of the pitch"></canvas>
-          <div id="scoreboard" class="scoreboard"></div>
-          <div id="pitch-hint" class="pitch-hint">Press play, then pause and click any player</div>
-        </div>
+      <div class="pitch-wrap" id="pitch-wrap">
+        <canvas id="pitch" aria-label="Bird's-eye view of the pitch"></canvas>
+        <div id="scoreboard" class="scoreboard" hidden></div>
+        <div id="pitch-hint" class="pitch-hint" hidden></div>
+      </div>
 
-        <div class="controls">
-          <button id="btn-restart" class="icon-btn" title="Rewind to start" aria-label="Rewind to start">
-            <svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14l-10-7z"/></svg>
-          </button>
-          <button id="btn-back" class="icon-btn" title="Previous moment (←)" aria-label="Previous moment">
-            <svg viewBox="0 0 24 24"><path d="M15 5v14l-9-7z"/></svg>
-          </button>
-          <button id="btn-play" class="icon-btn primary" title="Play / Pause (Space)" aria-label="Play">
-            <svg id="icon-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg>
-            <svg id="icon-pause" viewBox="0 0 24 24" style="display: none"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
-          </button>
-          <button id="btn-forward" class="icon-btn" title="Next moment (→)" aria-label="Next moment">
-            <svg viewBox="0 0 24 24"><path d="M9 5v14l9-7z"/></svg>
-          </button>
-          <div class="timeline">
-            <input id="timeline" type="range" min="0" max="1" step="0.01" value="0" aria-label="Timeline">
-            <div id="timeline-marks" class="timeline-marks"></div>
-          </div>
-          <span id="time-label" class="time-label">0.0 s</span>
-          <label class="toggle" title="Simplified pitch control × threat: gold = valuable space the selected team can win">
-            <input id="heatmap-toggle" type="checkbox"> Space value
-          </label>
-          <button id="pov-toggle" class="pill-btn" type="button" aria-pressed="false" aria-controls="pov-card" title="Player's view: see the moment through the selected player's eyes (V)">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C6.5 5 2.7 9.2 1.5 12c1.2 2.8 5 7 10.5 7s9.3-4.2 10.5-7C21.3 9.2 17.5 5 12 5zm0 11.5A4.5 4.5 0 1 1 12 7.5a4.5 4.5 0 0 1 0 9zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg>
-            Player's view
-          </button>
-          <select id="speed-select" class="speed" aria-label="Playback speed">
-            <option value="0.5">0.5×</option>
-            <option value="1" selected>1×</option>
-            <option value="2">2×</option>
-          </select>
+      <div class="controls" aria-label="Playback and tools">
+        <button id="btn-restart" class="icon-btn" title="Rewind to start" aria-label="Rewind to start">
+          <svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14l-10-7z"/></svg>
+        </button>
+        <button id="btn-back" class="icon-btn" title="Previous frame (←)" aria-label="Previous frame">
+          <svg viewBox="0 0 24 24"><path d="M15 5v14l-9-7z"/></svg>
+        </button>
+        <button id="btn-play" class="icon-btn primary" title="Play / Pause (Space)" aria-label="Play">
+          <svg id="icon-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg>
+          <svg id="icon-pause" viewBox="0 0 24 24" style="display: none"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+        </button>
+        <button id="btn-forward" class="icon-btn" title="Next frame (→)" aria-label="Next frame">
+          <svg viewBox="0 0 24 24"><path d="M9 5v14l9-7z"/></svg>
+        </button>
+        <div class="timeline">
+          <input id="timeline" type="range" min="0" max="1" step="0.01" value="0" aria-label="Timeline">
+          <div id="timeline-marks" class="timeline-marks"></div>
         </div>
+        <span id="time-label" class="time-label">0.0 s</span>
+        <label class="toggle" title="Simplified pitch control × threat: gold = valuable space the selected team can win">
+          <input id="heatmap-toggle" type="checkbox"> Space
+        </label>
+        <button id="pov-toggle" class="pill-btn" type="button" aria-pressed="false" aria-controls="pov-card" title="Player's view: see the moment through your eyes (V)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C6.5 5 2.7 9.2 1.5 12c1.2 2.8 5 7 10.5 7s9.3-4.2 10.5-7C21.3 9.2 17.5 5 12 5zm0 11.5A4.5 4.5 0 1 1 12 7.5a4.5 4.5 0 0 1 0 9zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg>
+          <span class="pov-label">Player's view</span>
+        </button>
+        <select id="situation-select" class="mini-select" aria-label="Match situation" title="Match situation: the same moment under a different score and minute"></select>
+        <select id="speed-select" class="mini-select" aria-label="Playback speed">
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+        </select>
+        <select id="scenario-select" hidden aria-label="Scenario"></select>
       </div>
 
       <div id="pick-card" class="card pick-card" aria-live="polite"></div>
-
-      <p class="key-hints" aria-label="Keyboard shortcuts">
-        <span><kbd>Space</kbd> play / pause</span>
-        <span><kbd>←</kbd> <kbd>→</kbd> previous / next moment</span>
-        <span><kbd>V</kbd> player's view</span>
-        <span>click the player's view, then <kbd>←</kbd> <kbd>→</kbd> or drag to look around, <kbd>0</kbd> to face the ball</span>
-      </p>
-
-      <ul class="legend">
-        <li><span class="swatch team-home"></span>Blue</li>
-        <li><span class="swatch team-away"></span>Red</li>
-        <li><span class="line open"></span>Open pass</li>
-        <li><span class="line blocked"></span>Lane blocked</li>
-        <li><span class="line marked"></span>Receiver marked</li>
-        <li><span class="swatch triangle"></span>Triangle</li>
-        <li><span class="line third-man"></span>Third-man route</li>
-        <li><span class="line decision"></span>Best option</li>
-        <li><span class="line yours"></span>Your pick</li>
-        <li><span class="swatch move"></span>Move here (off the ball)</li>
-        <li><span class="swatch space"></span>Free space</li>
-      </ul>
     </section>
 
     <div class="side">
+      <aside class="panel" id="panel" aria-live="polite"></aside>
       <section id="pov-card" class="card pov-card" hidden aria-label="Player's view">
         <div class="pov-head">
           <h3 id="pov-title">Player's view</h3>
@@ -141,9 +105,8 @@
           <canvas id="pov-canvas" tabindex="0" aria-label="First-person view of the selected player. Use the left and right arrow keys or drag to look around; 0 faces the ball."></canvas>
           <div id="pov-empty" class="pov-empty">Click a player on the pitch to see through their eyes</div>
         </div>
-        <p class="sub pov-note">Numbers are only readable in the centre of vision, as in Train. Follows the timeline: press play to watch the run from their eyes.</p>
+        <p class="sub pov-note">Numbers are only readable in the centre of vision, as in Train.</p>
       </section>
-      <aside class="panel" id="panel" aria-live="polite"></aside>
     </div>
   </main>
 
