@@ -364,6 +364,22 @@ kbd {
 .pick.on .letter { background: var(--ok); color: #fff; }
 .pick-card > .sub, .pick-card > .loading { margin: 10px 0 0; }
 .agent-dots { display: flex; align-items: center; margin-top: 16px; }
+/* the free pick: any teammate, then "Yes, this one" or "Choose again" */
+.pick-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; min-height: 34px; }
+.pick-foot .agent-dots { margin-top: 0; }
+.free-btn {
+  min-height: 34px; padding: 6px 14px; border-radius: var(--pill); border: 1px dashed var(--muted-2);
+  background: var(--surface); color: var(--text); font-weight: 600; font-size: 13px; cursor: pointer; white-space: nowrap;
+}
+.free-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+.pick-foot.choosing { padding: 8px 14px; border-radius: 12px; background: var(--accent-light); font-size: 14px; }
+.pick-foot.confirm { padding: 8px 8px 8px 14px; border-radius: 12px; background: var(--surface-2); }
+.pick-q { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 14px; }
+.pick-actions { display: flex; gap: 8px; }
+.pick-actions .sb-btn { min-height: 36px; padding: 6px 14px; font-size: 14px; }
+.pick-note-warn { color: var(--warn); font-weight: 600; }
+.pick.pending { border: 2px dashed var(--text); padding: 7px 9px 7px 7px; }
+#pitch { cursor: pointer; }
 .agent-dots .agent-dot { margin-right: -7px; border: 2px solid var(--surface); width: 30px; height: 30px; }
 .agent-dots .sub { margin-left: 18px; font-size: 14px; }
 

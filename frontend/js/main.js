@@ -429,16 +429,52 @@ function renderPick() {
     if (g.shot?.distance_m < 25) options.push({ key: 'shoot', label: 'Shoot', choice: { action: 'shoot' } });
     const mine = sel.call.choice;
     const isMine = (c) => mine && mine.action === c.action && (c.action !== 'pass' || mine.target_player_id === c.target_player_id);
+    const pending = sel.call.pending;
+    const isPending = (c) => pending && c.action === 'pass' && pending.target_player_id === c.target_player_id;
     body = `<div class="picks">${options.map((o, i) => `
-      <button class="pick${isMine(o.choice) ? ' on' : ''}" data-pick="${o.key}">
+      <button class="pick${isMine(o.choice) ? ' on' : ''}${isPending(o.choice) ? ' pending' : ''}" data-pick="${o.key}">
         <span class="letter">${isMine(o.choice) ? '✓' : String.fromCharCode(65 + i)}</span>${o.label}</button>`).join('')}</div>`;
+    el.pick.innerHTML = `<div class="answer-label">Your pick</div>${body}${freePickFoot(sel, g)}`;
+    return;
   }
   el.pick.innerHTML = `<div class="answer-label">Your pick</div>${body}${agentDots()}`;
 }
 
+/**
+ * The free pick: any teammate at all, even a far or a wrong one. Click them on the pitch, check it, then
+ * confirm ("Yes, this one") or choose again. Only a confirmed pick is reviewed.
+ */
+function freePickFoot(sel, g) {
+  const { pending, choosing, note } = sel.call;
+  if (pending) {
+    const t = g.teammates.find((o) => o.id === pending.target_player_id);
+    const how = t ? ` · ${Math.round(t.distance_m)} m pass, ${Math.round(Math.abs(t.forward_m))} m ${t.forward_m > 0 ? 'forward' : 'back'}` : '';
+    return `<div class="pick-foot confirm">
+      <span class="pick-q"><strong>Your pick: pass to #${pending.target_player_id}</strong><span class="sub">${how}</span></span>
+      <span class="pick-actions">
+        <button class="sb-btn primary" data-free="confirm">Yes, this one</button>
+        <button class="sb-btn" data-free="again">Choose again</button>
+      </span></div>`;
+  }
+  if (choosing) {
+    return `<div class="pick-foot choosing">
+      <span class="pick-q">${note ? `<span class="pick-note-warn">${note}</span>` : '<strong>Click any Blue teammate on the pitch.</strong> Near or far, it is your choice.'}</span>
+      <button class="link-btn" data-free="cancel">Cancel</button></div>`;
+  }
+  return `<div class="pick-foot">${agentDots()}
+    <button class="free-btn" data-free="start" title="Choose any teammate on the pitch">＋ Any other player</button></div>`;
+}
+
 el.pick.addEventListener('click', (e) => {
+  const call = state.selection?.call;
+  if (!call) return;
+  const free = e.target.closest('[data-free]')?.dataset.free;
+  if (free === 'start' || free === 'again') Object.assign(call, { choosing: true, pending: null, note: null });
+  else if (free === 'cancel') Object.assign(call, { choosing: false, pending: null, note: null });
+  else if (free === 'confirm' && call.pending) return void makeChoice(call.pending);
+  if (free) return void render();
   const key = e.target.closest('[data-pick]')?.dataset.pick;
-  if (!key || !state.selection?.call) return;
+  if (!key) return;
   const [action, id] = key.split(':');
   makeChoice(action === 'pass' ? { action, target_player_id: Number(id) } : { action });
 });
@@ -547,6 +583,16 @@ function draw(now) {
     if (isOffBall(sel.geometry)) {
       // Off the ball: only the runner and the passer matter on screen.
       focusIds = new Set([sel.player.id, sel.geometry.space_value.best_position.pass_from]);
+    }
+  }
+  const pending = sel?.call?.pending;
+  if (pending && sel.geometry) {
+    const positions = new Map(players.map((p) => [p.id, p]));
+    const me = positions.get(sel.geometry.selected.id);
+    const to = positions.get(pending.target_player_id);
+    if (me && to) {
+      drawDecision(view, pending, sel.geometry, me, positions, COLORS.ink);
+      tags.push([to, 'YOUR PICK?', 'pick']);
     }
   }
   view.drawPlayers(players, { selectedId: sel?.player.id ?? (state.pov.on ? state.pov.playerId : null), focusIds });
@@ -701,10 +747,15 @@ el.canvas.addEventListener('click', (e) => {
   const hit = view.hitTest(e.clientX - rect.left, e.clientY - rect.top, playback.current().players);
   if (!hit) return;
   const sel = state.selection;
-  if (sel?.call && hit.team === sel.player.team) {
-    // "Your call" for the ball carrier: any teammate is a pass to try (before or after the first answer),
-    // yourself is no choice. "Look at another player" ends the call to analyse someone else.
-    if (hit.id !== sel.player.id) makeChoice({ action: 'pass', target_player_id: hit.id });
+  if (sel?.call) {
+    // Your pick, free: any teammate becomes your pick to check, then "Yes, this one" or "Choose again".
+    // Yourself is no choice; a Red player isn't a pass. "Look at another player" ends the call.
+    if (hit.team !== sel.player.team) {
+      Object.assign(sel.call, { choosing: true, pending: null, note: `#${hit.id} is a Red player: pick a Blue teammate.` });
+    } else if (hit.id !== sel.player.id) {
+      Object.assign(sel.call, { choosing: false, pending: { action: 'pass', target_player_id: hit.id }, note: null });
+    }
+    render();
     return;
   }
   playback.pause();

@@ -294,7 +294,7 @@ export function callVerdict(choice, g, d, mode) {
     if (!best) return { tone: 'ok', text: `#${t.id} is open with ${Math.round(t.receiver_space_m)} m of room: a safe option.${bestLine}${waiting}` };
     if (t.forward_m < 0 && best.forward_m > 0) {
       return mode === 'keep'
-        ? { tone: 'ok', text: `a safe pass ${Math.round(-t.forward_m)} m back keeps the ball, which is sensible when protecting a lead.${bestLine}` }
+        ? { tone: 'ok', text: `a safe pass ${Math.round(-t.forward_m)} m back keeps the ball, which fits when your team wants to keep possession.${bestLine}` }
         : { tone: 'ok', text: `the pass to #${t.id} is safe but goes ${Math.round(-t.forward_m)} m backwards, so your team loses ground.${bestLine}` };
     }
     if (t.receiver_space_m < best.receiver_space_m - 3) {
