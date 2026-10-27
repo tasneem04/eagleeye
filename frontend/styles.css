@@ -279,6 +279,7 @@ kbd {
 .status.done svg { stroke: var(--ok); }
 .status.now { color: #fff; background: var(--accent); }
 .status.next { color: #fff; background: var(--text); }
+.status.todo { color: var(--text); background: var(--surface); border: 1px solid var(--border); }
 .status.locked { color: var(--muted-2); background: var(--surface); border: 1px solid var(--border); font-weight: 600; }
 .status.locked svg, .lock-note svg { fill: none; stroke: currentColor; stroke-width: 2; }
 .sb-map { margin: 18px 0 18px; padding: 14px 14px 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; }

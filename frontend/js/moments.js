@@ -29,11 +29,13 @@ export function markDone(scenarioId, index) {
   return done;
 }
 
-/** Moments open so far: every finished one in a row, plus the next two (the one to do now and the one after). */
+/**
+ * Moments open so far: everything up to the furthest one you finished, plus the next two (the one to do
+ * now and the one after). A skipped earlier moment never blocks the ones after your progress.
+ */
 export function unlockedCount(moments, done) {
-  let n = 0;
-  while (n < moments.length && done.has(n)) n++;
-  return Math.min(moments.length, n + 2);
+  const furthest = Math.max(-1, ...[...done].filter((i) => i < moments.length));
+  return Math.min(moments.length, furthest + 3);
 }
 
 export function isUnlocked(index, moments, done) {
@@ -54,16 +56,19 @@ export function sidebarHtml(scenario, moments, now, done, minute, search = '') {
   const n = moments.length;
   const open = unlockedCount(moments, done);
   const doneCount = moments.filter((_, i) => done.has(i)).length;
+  // "Next" is one moment: the first open, unfinished one after your furthest finished moment.
+  const furthest = Math.max(-1, ...[...done].filter((i) => i < n));
+  const nextIdx = moments.findIndex((_, i) => i > furthest && i < open && !done.has(i) && i !== now);
   const q = search.trim().toLowerCase();
   const rows = moments.map((m, i) => {
     const locked = i >= open;
     const isNow = i === now;
     const isDone = done.has(i) && !isNow;
-    const isNext = !isNow && !isDone && !locked;
     const status = isNow ? '<span class="status now">Now</span>'
       : isDone ? `<span class="status done">${CHECK}Done</span>`
-        : isNext ? '<span class="status next">Next</span>'
-          : `<span class="status locked">${LOCK}Locked</span>`;
+        : i === nextIdx ? '<span class="status next">Next</span>'
+          : !locked ? '<span class="status todo">To do</span>'
+            : `<span class="status locked">${LOCK}Locked</span>`;
     const lead = isNow ? BARS : isDone ? CHECK : String(i + 1);
     const cls = [isNow ? 'on' : '', isDone ? 'done' : '', locked ? 'locked' : '', q && !m.title.toLowerCase().includes(q) ? 'dim' : ''].join(' ');
     const label = locked ? `Locked: finish the moments before it first` : `Go to moment ${i + 1}: ${m.title}`;
@@ -76,7 +81,7 @@ export function sidebarHtml(scenario, moments, now, done, minute, search = '') {
       </tr>`;
   }).join('');
   const lockNote = open < n
-    ? `<div class="lock-note">${LOCK}<span>Finish <strong>${esc(moments[open - 1].title)}</strong> to unlock ${esc(moments[open].title)}.</span></div>`
+    ? `<div class="lock-note">${LOCK}<span>Finish <strong>${esc(moments[furthest + 1].title)}</strong> to unlock ${esc(moments[open].title)}.</span></div>`
     : doneCount === n
       ? `<div class="lock-note all">${CHECK}<span>All ${n} moments done. Replay any of them, or go to Train.</span></div>`
       : '';
