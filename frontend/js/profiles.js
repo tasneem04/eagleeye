@@ -147,6 +147,7 @@ function cleanHistory(history) {
       trial_id: h.trial_id, level: h.level, score: h.score, verdict: h.verdict, scans: h.scans,
       target_scans: h.target_scans, timed: Boolean(h.timed), too_slow: Boolean(h.too_slow),
       opened_body: Boolean(h.opened_body),
+      ...(num(h.coverage, 0, 1) ? { coverage: h.coverage } : {}),
       missed: (Array.isArray(h.missed) ? h.missed : []).slice(0, 12)
         .filter((m) => m && ['front', 'behind', 'left', 'right'].includes(m.side) && num(m.angle, 0, 180))
         .map((m) => ({ side: m.side, angle: m.angle, open: Boolean(m.open) })),

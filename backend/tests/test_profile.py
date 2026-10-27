@@ -91,3 +91,15 @@ def test_demo_player_is_graded_by_real_code_and_shows_a_focus(make_client):
     assert rec["focus"]["key"] == "blind_side_right"
     meta = {m["id"]: m for m in client.app.state.trial_meta}
     assert meta[rec["next_trial_id"]]["target_side"] == "right"
+
+
+def test_history_keeps_how_full_the_picture_was(make_client):
+    """Each drill saves its key-player share, so the reveal can show the picture getting fuller."""
+    client, _ = make_client()
+    with client:
+        demo = client.get("/api/training/demo-history").json()["history"]
+        old = [{k: v for k, v in h.items() if k != "coverage"} for h in demo]  # saved before coverage existed
+        assert client.post("/api/training/next", json={"level": "rookie", "history": old}).status_code == 200
+        bad = [dict(demo[0], coverage=1.5)]
+        assert client.post("/api/training/next", json={"level": "rookie", "history": bad}).status_code == 422
+    assert all(0 <= h["coverage"] < 1 for h in demo)  # the demo player never checks one shoulder

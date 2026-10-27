@@ -703,6 +703,7 @@ export class Training {
         <div class="sub">Your memory map: only what you saw, where you last saw it.
           A number means you identified the player, a coloured <strong>?</strong> means you only saw the shirt,
           and a grey <strong>?</strong> is a shape you sensed at the edge of your vision.</div>
+        ${this.#lastPictureHtml()}
         <div class="memory-wrap${dribbling ? ' dribble-mode' : ''}"><canvas id="memory-map" aria-label="Memory map of the players you saw"></canvas></div>
         ${dribbling
           ? `<div class="sub"><strong>Dribble:</strong> click a teammate to carry the ball towards them, or click any spot to carry it into that space (up to ${MAX_CARRY_M} m).</div>
@@ -713,6 +714,16 @@ export class Training {
                <button class="choice-btn" data-train="shoot">Shoot</button>
              </div>`}
       </div>`;
+  }
+
+  /** On the memory map: how full the picture was last drill, as something to beat. */
+  #lastPictureHtml() {
+    const [last] = pictureShares(profiles.loadHistory(), 1);
+    if (last == null) return '';
+    const text = last >= 1
+      ? 'Last drill you had every key player in your picture. Keep it up.'
+      : `Last drill your picture had ${pct(last)} of the key players. Try to beat it.`;
+    return `<div class="sub picture-trend">${text}</div>`;
   }
 
   #revealHtml() {
@@ -745,6 +756,7 @@ export class Training {
     const missed = result.missed.length
       ? `<p class="missed">Not identified: ${result.missed.map((m) => `#${m.id} (${esc(m.where)}${m.noticed ? ', only glimpsed' : ''})`).join(', ')}</p>`
       : '<p class="missed ok">You identified every key player. That\'s an eagle eye!</p>';
+    const trend = pictureTrend(pictureShares(profiles.loadHistory()));  // includes this drill (saved already)
     return `
       <div class="card score-card">
         <div class="score-line">
@@ -752,6 +764,7 @@ export class Training {
           <span class="chip ${tone}">${label}</span>
         </div>
         <ul class="facts">${facts.map(([k, v]) => `<li><span class="k">${k}</span><span>${esc(v)}</span></li>`).join('')}</ul>
+        ${trend ? `<div class="sub picture-trend">Your picture: ${trend}</div>` : ''}
         ${missed}
         <div class="sub">On the pitch: blue wedges show where you looked, gold is the best option, white is your choice.</div>
       </div>
@@ -779,6 +792,7 @@ export class Training {
     const p = profiles.currentProfile();
     const last = h.slice(-8);
     const avgScans = (last.reduce((s, r) => s + r.scans, 0) / last.length).toFixed(1);
+    const shares = pictureShares(last, last.length);
     const code = p && !p.demo ? `<button class="choice-btn" data-train="copy-code">Copy my player code</button>` : '';
     return `
       <div class="card">
@@ -787,6 +801,7 @@ export class Training {
         <ul class="facts">
           <li><span class="k">Last scores</span><span>${last.map((r) => r.score).join(' → ')}</span></li>
           <li><span class="k">Scans per drill</span><span>${last.map((r) => `${r.scans}/${r.target_scans}`).join(' → ')} (avg ${avgScans})</span></li>
+          ${shares.length ? `<li><span class="k">Players in your picture</span><span>${esc(pictureTrend(shares) || pct(shares[0]))}</span></li>` : ''}
         </ul>
         ${this.codeShown ? `<textarea class="text-input code-out" rows="3" readonly>${esc(this.codeShown)}</textarea>
           <div class="sub">Paste this code on another device under "Who's playing?". It holds only your nickname and drill results.</div>` : ''}
@@ -933,6 +948,7 @@ export class Training {
       verdict: result.verdict,
       scans: result.scans,
       target_scans: result.target_scans,
+      coverage: result.coverage,
       timed: this.levels[this.level].decision_s != null,
       too_slow: Boolean(result.too_slow),
       opened_body: Boolean(result.opened_body),
@@ -941,6 +957,23 @@ export class Training {
     });
     profiles.saveHistory(h);
   }
+}
+
+/** The share of key players in the player's picture (0-1) for the last n drills that recorded it, oldest first. */
+function pictureShares(history, n = 5) {
+  return history.filter((h) => Number.isFinite(h.coverage)).slice(-n).map((h) => h.coverage);
+}
+
+function pct(share) {
+  return `${Math.round(share * 100)}%`;
+}
+
+/** "33% → 50% → 83%, better than last drill ↑": is the picture getting fuller? Empty under 2 drills. */
+function pictureTrend(shares) {
+  if (shares.length < 2) return '';
+  const diff = Math.round(shares.at(-1) * 100) - Math.round(shares.at(-2) * 100);
+  const word = diff > 0 ? 'better than last drill ↑' : diff < 0 ? 'fewer than last drill' : 'same as last drill';
+  return `${shares.map(pct).join(' → ')}, ${word}`;
 }
 
 /** A tiny line of recent scores (0-100). */

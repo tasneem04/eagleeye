@@ -484,6 +484,7 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; border-radius: 5
 .score-big span { font-size: 16px; color: var(--muted); font-weight: 600; }
 .missed { margin: 10px 0 6px; color: #fca5a5; font-size: 14px; }
 .missed.ok { color: #bbf7d0; }
+.sub.picture-trend { margin: 6px 0; color: #93c5fd; }
 
 /* Summary of the agents' answer at the top of the panel */
 .verdict { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

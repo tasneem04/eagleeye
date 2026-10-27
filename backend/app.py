@@ -515,6 +515,7 @@ class HistoryItem(BaseModel):
     verdict: Literal["best", "good", "ok", "risky"]
     scans: int = Field(ge=0, le=50)
     target_scans: int = Field(ge=1, le=20)
+    coverage: float | None = Field(default=None, ge=0, le=1)  # share of key players in the player's picture
     timed: bool = False
     too_slow: bool = False
     opened_body: bool = False

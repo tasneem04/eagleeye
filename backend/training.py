@@ -401,7 +401,7 @@ def history_item(trial: dict, level: str, result: dict) -> dict:
     """One graded drill in the shape the browser keeps (see frontend/js/training.js): nothing identifying."""
     return {
         "trial_id": trial["id"], "level": level, "score": result["score"], "verdict": result["verdict"],
-        "scans": result["scans"], "target_scans": result["target_scans"],
+        "scans": result["scans"], "target_scans": result["target_scans"], "coverage": result["coverage"],
         "timed": LEVELS[level]["decision_s"] is not None, "too_slow": bool(result.get("too_slow")),
         "opened_body": bool(result.get("opened_body")),
         "missed": [{"side": m["side"], "angle": m["angle"], "open": m["open"]} for m in result["missed"][:12]],
