@@ -4,6 +4,29 @@ An AI football vision coach that teaches young players to scan the pitch. You wa
 
 > Built for the Microsoft × Premier League "Inside the Game" hackathon. **All data is synthetic**: fictional Blue and Red teams, shirt numbers only, and moments generated in code. No real players, clubs or match data are used.
 
+## Try it
+
+**Live demo: https://eagleeye-hackathon.azurewebsites.net/**: no sign-up, works in any desktop browser (phone layout is not tuned yet).
+
+1. **Analyse.** The left column lists the match's moments. In each one *you* are the Blue player on the ball (marked YOU).
+   - Make your pick first: one of the four options under the pitch, or **＋ Any other player** and click any teammate, then **Yes, this one**.
+   - Then EagleEye's answer opens: the best move (gold arrow), why, where to look first, and one line from each of the four Foundry agents. Your pick is compared with the best one, and **What happens next** plays it out.
+   - Your pick finishes the moment and unlocks the next ones.
+2. **Train.** Pick a nickname (no real name, nothing leaves your browser) or the **Demo player**, which has a sample history.
+   - Scan from the player's own eyes with **A / D** (or ← / →) and **W** to open your body, before the ball arrives.
+   - Choose from what you saw. The view from above opens only after you answer, with your score and the coach's debrief.
+   - After 3 drills EagleEye names your weak spot (for example a blind shoulder) and picks the next drill for it.
+3. **Progress.** Your record since you started, your focus and your last drills.
+
+The first look at a new moment takes about 20 seconds while the agents work; after that it is instant.
+
+## Built with Microsoft
+
+- **Microsoft Foundry Agent Service**: five agents on GPT-4.1-mini. FieldMapper and TacticalContextAgent run in parallel, then DecisionAgent, then CoachAgent (who also writes the Train debriefs). KnowledgeScout researches new coaching notes in the background.
+- **Foundry File Search** (a vector store) gives TacticalContextAgent the coaching knowledge; **Foundry Web Search** is KnowledgeScout's research tool.
+- **Azure App Service** (Linux, Python) hosts the app, signed in to Foundry with a **managed identity** and **Microsoft Entra ID**: no keys anywhere.
+- Code decides what is correct (lanes, space, offside, the replay); the agents read the moment and explain it.
+
 ## Run locally
 
 ```powershell
