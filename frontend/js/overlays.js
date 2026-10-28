@@ -3,24 +3,44 @@
 
 import { COLORS } from './pitch.js';
 
-/** A small pill over a player: "YOU" in ink, or the answer's "OPEN 6.2m" in gold. */
-export function drawPitchTag(view, p, text, kind) {
+const TAG_STYLE = {
+  you: { fill: COLORS.ink, ink: '#ffffff' },
+  best: { fill: COLORS.accent, ink: '#3d2b00' },
+  pick: { fill: '#ffffff', ink: COLORS.ink },
+  missed: { fill: '#c2410c', ink: '#ffffff' },
+  glimpsed: { fill: '#f59e0b', ink: '#3d2b00' },
+};
+
+/**
+ * A small pill by a player: "YOU" in ink above, the answer's "OPEN 6.2m" in gold to the right.
+ * `place` overrides where it sits: 'above', 'right' or 'below'.
+ */
+export function drawPitchTag(view, p, text, kind, place = kind === 'best' ? 'right' : 'above') {
   const { ctx } = view;
   const [x, y] = view.toPx(p.x, p.y);
+  const style = TAG_STYLE[kind] ?? TAG_STYLE.you;
   ctx.save();
   ctx.font = '800 10px "DM Sans", system-ui, sans-serif';
   const w = ctx.measureText(text).width + 14;
   const h = 17;
-  const top = y - view.playerRadius - h - 6;
-  const left = kind === 'best' ? x + view.playerRadius + 4 : x - w / 2;
-  ctx.fillStyle = kind === 'best' ? COLORS.accent : COLORS.ink;
+  const gap = view.playerRadius + (kind === 'missed' || kind === 'glimpsed' ? 12 : 6);
+  let left = x - w / 2;
+  let top = place === 'below' ? y + gap : y - gap - h;
+  if (place === 'right') [left, top] = [x + view.playerRadius + 4, y - h / 2];
+  // Keep the pill inside the canvas.
+  left = Math.min(Math.max(4, left), view.cssWidth - w - 4);
+  top = Math.min(Math.max(4, top), view.cssHeight - h - 4);
+  ctx.shadowColor = 'rgba(29, 20, 22, 0.18)';
+  ctx.shadowBlur = 4;
+  ctx.fillStyle = style.fill;
   ctx.beginPath();
-  ctx.roundRect(left, kind === 'best' ? y - h / 2 : top, w, h, h / 2);
+  ctx.roundRect(left, top, w, h, h / 2);
   ctx.fill();
-  ctx.fillStyle = kind === 'best' ? '#3d2b00' : '#ffffff';
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = style.ink;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, left + w / 2, (kind === 'best' ? y : top + h / 2) + 0.5);
+  ctx.fillText(text, left + w / 2, top + h / 2 + 0.5);
   ctx.restore();
 }
 
@@ -231,40 +251,105 @@ function drawPressure(view, pressure, me, positions) {
 /** Where the learner's eyes went: one faint wedge per gaze sample, so frequent looks build up. */
 export function drawScanCones(view, samples, halfAngleDeg, radiusM = 28) {
   const { ctx } = view;
-  ctx.fillStyle = 'rgba(56, 189, 248, 0.03)';
+  // One path for every sample, filled once: the area you looked at reads as one soft shape.
+  ctx.beginPath();
   for (const s of samples) {
     const [x, y] = view.toPx(s.x, s.y);
     const a = (s.yaw * Math.PI) / 180;
     const half = (halfAngleDeg * Math.PI) / 180;
     // Yaw is in metres-space; the canvas scales x and y equally per metre, so angles carry over.
-    ctx.beginPath();
     ctx.moveTo(x, y);
     ctx.arc(x, y, radiusM * view.scale, a - half, a + half);
     ctx.closePath();
-    ctx.fill();
   }
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+  ctx.fill('nonzero');
+}
+
+/**
+ * "Not checked": the side you never looked at, hatched, wherever a player you missed was standing.
+ * Bearings are in metres-space, like the scan samples.
+ */
+export function drawUnchecked(view, me, samples, halfAngleDeg, missed, positions) {
+  const STEP = 3;
+  const toM = (p) => [p.x * 1.05, p.y * 0.68];
+  const wrap = (d) => ((d % 360) + 360) % 360;
+  const covered = new Array(360 / STEP).fill(false);
+  for (const s of samples) {
+    for (let d = -halfAngleDeg; d <= halfAngleDeg; d += STEP) covered[Math.floor(wrap(s.yaw + d) / STEP)] = true;
+  }
+  const [mx, my] = toM(me);
+  const done = new Set();
+  const { ctx } = view;
+  for (const m of missed) {
+    const p = positions.get(m.id);
+    if (!p || m.noticed) continue;
+    const [px, py] = toM(p);
+    const bearing = wrap((Math.atan2(py - my, px - mx) * 180) / Math.PI);
+    let i = Math.floor(bearing / STEP);
+    if (covered[i] || done.has(i)) continue;
+    // Grow the arc both ways, around the missed player, while it stays unchecked (at most ~100 degrees).
+    const n = covered.length;
+    const maxSteps = Math.round(100 / STEP);
+    let lo = i;
+    let hi = i;
+    while (hi - lo + 1 < maxSteps) {
+      const down = !covered[(((lo - 1) % n) + n) % n];
+      const up = !covered[(hi + 1) % n];
+      if (!down && !up) break;
+      if (down) lo -= 1;
+      if (up && hi - lo + 1 < maxSteps) hi += 1;
+    }
+    for (let k = lo; k <= hi; k++) done.add(((k % n) + n) % n);
+    const radius = Math.min(26, Math.hypot(px - mx, py - my) + 7) * view.scale;
+    const [cx, cy] = view.toPx(me.x, me.y);
+    const a0 = (lo * STEP * Math.PI) / 180;
+    const a1 = ((hi + 1) * STEP * Math.PI) / 180;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, radius, a0, a1);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(29, 20, 22, 0.08)';
+    ctx.fill();
+    ctx.clip();
+    ctx.strokeStyle = 'rgba(29, 20, 22, 0.22)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let o = -radius * 2; o < radius * 2; o += 9) {
+      ctx.moveTo(cx + o - radius, cy - radius);
+      ctx.lineTo(cx + o + radius, cy + radius);
+    }
+    ctx.stroke();
+    ctx.restore();
+    // The label sits inside the arc, off to one side of the missed player and his tags.
+    const mid = a0 + (a1 - a0) * 0.22;
+    const lr = radius * 0.62;
+    ctx.save();
+    ctx.font = '800 10px "DM Sans", system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(29, 20, 22, 0.62)';
+    ctx.fillText('NOT CHECKED', cx + Math.cos(mid) * lr, cy + Math.sin(mid) * lr);
+    ctx.restore();
+  }
+  return done.size > 0;
 }
 
 /** Key players the learner never identified: red if never seen, amber if only glimpsed. */
+/** A dashed ring round each key player you missed (the "MISSED · #10" tags go on after the players). */
 export function drawMissed(view, missed, positions) {
   const { ctx } = view;
   ctx.lineWidth = 2.5;
   ctx.setLineDash([5, 4]);
-  ctx.font = '700 11px "DM Sans", system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
   for (const m of missed) {
     const p = positions.get(m.id);
     if (!p) continue;
-    const color = m.noticed ? '#f59e0b' : '#c2410c';
     const [x, y] = view.toPx(p.x, p.y);
-    const r = view.playerRadius + 7;
-    ctx.strokeStyle = color;
+    ctx.strokeStyle = m.noticed ? '#f59e0b' : '#c2410c';
     ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.arc(x, y, view.playerRadius + 7, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.fillStyle = color;
-    ctx.fillText(m.noticed ? 'only glimpsed' : 'missed', x, y + r + 3);
   }
   ctx.setLineDash([]);
 }

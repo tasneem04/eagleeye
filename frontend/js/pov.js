@@ -9,7 +9,7 @@ const EYE_HEIGHT = 1.7;
 const PLAYER_WIDTH = 0.55;
 const NEAR = 0.4;
 export const FOV_DEG = 90;
-const HORIZON = 0.42; // share of the canvas height above the horizon
+export const HORIZON = 0.42; // share of the canvas height above the horizon
 const INK = '#1d1416';
 
 // Blue: blue shirt, white shorts. Red: red shirt, dark shorts. Keepers wear their own colour.
@@ -32,17 +32,31 @@ export class PovView {
     this.boxes = []; // where each player was drawn this frame, for clicks and labels
     // Vision zones around the gaze (degrees), replaced by the server's values.
     this.zones = { identify_deg: 30, colour_deg: 60, presence_deg: 100 };
+    this.horizonShare = HORIZON; // lowered a little while a card covers the bottom of the view
+    // The canvas size on screen, kept by an observer. Reading it every frame (getBoundingClientRect)
+    // forced a page layout per frame, because the HUD text changes every frame too.
+    this.cssW = canvas.clientWidth;
+    this.cssH = canvas.clientHeight;
+    new ResizeObserver(([entry]) => {
+      this.cssW = entry.contentRect.width;
+      this.cssH = entry.contentRect.height;
+    }).observe(canvas);
   }
 
   /** Match the canvas pixels to its size on screen (cheap when nothing changed). */
   fit() {
-    const rect = this.canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    const w = Math.max(1, Math.round(rect.width * dpr));
-    const h = Math.max(1, Math.round(rect.height * dpr));
+    const w = Math.max(1, Math.round(this.cssW * dpr));
+    const h = Math.max(1, Math.round(this.cssH * dpr));
     if (this.canvas.width !== w || this.canvas.height !== h) {
       this.canvas.width = w;
       this.canvas.height = h;
+      // Make the blur's scratch canvases now, at their largest, not during the first head turn.
+      this.blurCanvas ??= document.createElement('canvas');
+      this.spriteCanvas ??= document.createElement('canvas');
+      [this.blurCanvas.width, this.blurCanvas.height] = [Math.ceil(w * 0.85), Math.ceil(h * 0.85)];
+      [this.spriteCanvas.width, this.spriteCanvas.height] = [Math.max(this.spriteCanvas.width, 160), Math.max(this.spriteCanvas.height, 320)];
+      for (const c of [this.blurCanvas, this.spriteCanvas]) c.getContext('2d').drawImage(this.canvas, 0, 0, 1, 1);
     }
   }
 
@@ -53,10 +67,9 @@ export class PovView {
     this.yaw = yaw;
     this.cos = Math.cos(yaw);
     this.sin = Math.sin(yaw);
-    const rect = this.canvas.getBoundingClientRect();
-    this.w = rect.width;
-    this.h = rect.height;
-    this.horizon = this.h * HORIZON;
+    this.w = this.cssW;
+    this.h = this.cssH;
+    this.horizon = this.h * this.horizonShare;
     this.focal = this.w / 2 / Math.tan(((FOV_DEG / 2) * Math.PI) / 180);
   }
 
@@ -98,17 +111,38 @@ export class PovView {
     const dpr = window.devicePixelRatio || 1;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.boxes = [];
-    // Motion blur while the gaze is sweeping (browsers without canvas filters just skip it).
-    this.motionBlur = blur;
-    ctx.filter = blur > 0.2 ? `blur(${blur.toFixed(1)}px)` : 'none';
     this.#backdrop();
     this.#stripes();
     this.#lines();
     this.#goals();
     this.#people(players, ball);
-    ctx.filter = 'none';
+    // Motion blur while the gaze is sweeping. No canvas `filter`: a blur filter on every shape
+    // dropped the drill to a few frames a second. Shrinking the picture and stretching it back
+    // gives the same softness for the cost of two image copies.
+    if (blur > 0.2) this.#soften(blur);
     this.#vignette();
     this.#peripheral(players);
+  }
+
+  /** Soften the whole canvas by about `px` css pixels (downscale, then upscale with smoothing). */
+  #soften(px) {
+    const { canvas, ctx } = this;
+    const s = Math.max(0.12, 1 / (1 + px * 0.9));
+    const w = Math.max(1, Math.round(canvas.width * s));
+    const h = Math.max(1, Math.round(canvas.height * s));
+    this.blurCanvas ??= document.createElement('canvas');
+    const b = this.blurCanvas;
+    // Only ever grow it: the blur changes every frame, and resizing a canvas reallocates it.
+    if (b.width < w || b.height < h) [b.width, b.height] = [Math.max(b.width, w), Math.max(b.height, h)];
+    const bctx = b.getContext('2d');
+    bctx.imageSmoothingEnabled = true;
+    bctx.drawImage(canvas, 0, 0, w, h);
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'low'; // plain bilinear: soft enough, and 'high' stalled on first use
+    ctx.drawImage(b, 0, 0, w, h, 0, 0, canvas.width, canvas.height);
+    ctx.restore();
   }
 
   /**
@@ -276,30 +310,49 @@ export class PovView {
       const [f, r] = this.cam(mx, my);
       items.push({ kind: 'ball', f, r });
     }
-    const motion = this.motionBlur > 0.2 ? `blur(${this.motionBlur.toFixed(1)}px)` : 'none';
     items
       .filter((it) => it.f > NEAR + 0.3)
       .sort((a, b) => b.f - a.f)
-      .forEach((it) => {
-        if (it.kind === 'ball') this.#ball(it);
-        else this.#player(it);
-        this.ctx.filter = motion; // per-player softening must not leak to the next item
-      });
+      .forEach((it) => (it.kind === 'ball' ? this.#ball(it) : this.#player(it)));
   }
 
   #player({ p, f, r }) {
-    const { ctx } = this;
-    // Outside the central zone you see the shirt colour but can't read the number, and the figure is soft.
-    const identifiable = PovView.offAxis(f, r) <= this.zones.identify_deg;
-    const soft = identifiable ? this.motionBlur : Math.max(this.motionBlur, 1.6);
-    ctx.filter = soft > 0.2 ? `blur(${soft.toFixed(1)}px)` : 'none';
     const px = (PLAYER_WIDTH / f) * this.focal;
     const y = (height) => this.screen(f, r, height)[1];
     const [x, feet] = this.screen(f, r, 0);
-    const kit = KITS[p.role === 'goalkeeper' ? `${p.team}Keeper` : p.team] ?? KITS.home;
-    const skin = SKIN[p.id % SKIN.length];
     const headR = Math.max(1.5, px * 0.27);
     const head = y(1.6);
+    this.boxes.push({ id: p.id, x, top: head - headR, bottom: feet, half: px * 0.75 });
+    // Outside the central zone you see the shirt colour but can't read the number, and the figure is soft:
+    // drawn small on a scratch canvas, then stretched back into place.
+    if (PovView.offAxis(f, r) > this.zones.identify_deg) {
+      const left = x - px * 0.95;
+      const top = head - headR * 1.3;
+      const w = px * 1.9;
+      const h = feet + px * 0.3 - top;
+      const s = 0.32; // about a 1.6 px blur at player size
+      const sw = Math.max(1, Math.ceil(w * s));
+      const sh = Math.max(1, Math.ceil(h * s));
+      this.spriteCanvas ??= document.createElement('canvas');
+      const c = this.spriteCanvas;
+      if (c.width < sw || c.height < sh) [c.width, c.height] = [Math.max(c.width, sw), Math.max(c.height, sh)];
+      const sctx = c.getContext('2d');
+      sctx.setTransform(1, 0, 0, 1, 0, 0);
+      sctx.clearRect(0, 0, c.width, c.height); // all of it: smoothing reads a pixel past the edge
+      sctx.setTransform(s, 0, 0, s, -left * s, -top * s);
+      this.#figure(sctx, p, { x, feet, px, y, headR, head });
+      this.ctx.imageSmoothingEnabled = true;
+      this.ctx.drawImage(c, 0, 0, sw, sh, left, top, sw / s, sh / s);
+      return;
+    }
+    this.#figure(this.ctx, p, { x, feet, px, y, headR, head });
+    this.#number(p, { x, px, y, headR, head });
+  }
+
+  /** The body: shadow, legs, shorts, arms, shirt, head and hair. */
+  #figure(ctx, p, { x, feet, px, y, headR, head }) {
+    const kit = KITS[p.role === 'goalkeeper' ? `${p.team}Keeper` : p.team] ?? KITS.home;
+    const skin = SKIN[p.id % SKIN.length];
 
     ctx.fillStyle = 'rgba(29, 20, 22, 0.18)';
     ctx.beginPath();
@@ -344,16 +397,14 @@ export class PovView {
     ctx.beginPath();
     ctx.arc(x, head - headR * 0.15, headR, Math.PI * 1.05, Math.PI * 1.95);
     ctx.fill();
+  }
 
-    this.boxes.push({ id: p.id, x, top: head - headR, bottom: feet, half: px * 0.75 });
-
-    // Shirt number: on the chest when close, as a tag above the head when far.
+  /** Shirt number: on the chest when close, as a tag above the head when far. Only in the central zone. */
+  #number(p, { x, px, y, headR, head }) {
+    const { ctx } = this;
+    const kit = KITS[p.role === 'goalkeeper' ? `${p.team}Keeper` : p.team] ?? KITS.home;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    if (!identifiable) {
-      ctx.filter = this.motionBlur > 0.2 ? `blur(${this.motionBlur.toFixed(1)}px)` : 'none';
-      return;
-    }
     if (px > 22) {
       ctx.fillStyle = '#ffffff';
       ctx.font = `800 ${Math.round(px * 0.5)}px 'DM Sans', system-ui, sans-serif`;

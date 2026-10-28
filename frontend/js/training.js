@@ -4,11 +4,10 @@
 
 import * as api from './api.js';
 import { Gaze, MOVING_DEG_S } from './gaze.js';
-import { arrow, drawDecision, drawLanes, drawMissed, drawScanCones } from './overlays.js';
-import { clarityCard } from './panel.js';
+import { arrow, drawDecision, drawMissed, drawPitchTag, drawScanCones, drawUnchecked } from './overlays.js';
 import { COLORS, PitchView } from './pitch.js';
 import { Playback } from './playback.js';
-import { PovView } from './pov.js';
+import { HORIZON, PovView } from './pov.js';
 import * as profiles from './profiles.js';
 import { drawReplayMarks, replayFrame } from './replay.js';
 
@@ -36,6 +35,9 @@ const toU = (mx, my) => [mx / 1.05, my / 0.68];
 const wrap = (d) => ((d + 540) % 360) - 180;
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const SIDES = { left: -1, right: 1 };
+const CHOOSE_HORIZON = 0.3; // while the choose card covers the bottom, the players stand above it
+const NARROW = window.matchMedia('(max-width: 760px)'); // phones: the cards sit under the view, not on it
+const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 // Small line icons for the cards (drawn here, no icon pack).
 const ICON = {
@@ -44,6 +46,11 @@ const ICON = {
   eye: '<svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   arrow: '<svg viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></svg>',
   lock: '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+  retry: '<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v5h5"/></svg>',
+  dice: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="M9 9h.01M15 9h.01M9 15h.01M15 15h.01" stroke-width="3"/></svg>',
+  play: '<svg viewBox="0 0 24 24" class="solid"><path d="M8 5.5v13l10.5-6.5z"/></svg>',
+  check: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  chevron: '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
 };
 
 function bearing(from, to) {
@@ -274,6 +281,8 @@ export class Training {
     this.open = 0;
     this.openTarget = 0;
     this.hud.querySelector('[data-body]').classList.remove('on');
+    this.hud.classList.remove('deciding');
+    this.hud.querySelector('#hud-label').textContent = 'Ball arrives';
     this.phase = 'scanning';
     this.hud.hidden = false;
     this.#render();
@@ -284,7 +293,11 @@ export class Training {
     this.decideMode = 'pass';
     this.openedBody = this.open > 0.8;
     this.gaze.reset();
-    this.hud.hidden = true;
+    // The top pill stays, now as a status line: scans made, ball at your feet, the clock.
+    const limit = this.levels[this.level].decision_s;
+    this.hud.classList.add('deciding');
+    this.hud.querySelector('#hud-label').textContent = 'Ball at your feet';
+    this.hud.querySelector('#hud-clock').textContent = limit ? `${limit} s to decide` : `No clock on ${LEVEL_NAMES[this.level]}`;
     this.hoverId = null;
     // You can play to a teammate you identified or whose shirt you saw, never to an unknown shape.
     const info = new Map(this.playback.current().players.map((p) => [p.id, p]));
@@ -450,6 +463,11 @@ export class Training {
     }
     this.#orient(me, state.ball);
     this.pov.fit();
+    // Tilt the view down a little while you choose, easing so it never jumps.
+    const lowered = (this.phase === 'deciding' || this.phase === 'evaluating') && !NARROW.matches;
+    const target = lowered ? CHOOSE_HORIZON : HORIZON;
+    const share = this.pov.horizonShare;
+    this.pov.horizonShare = REDUCED_MOTION.matches || Math.abs(target - share) < 0.002 ? target : share + (target - share) * 0.15;
     this.pov.setCamera([me.x, me.y], this.bodyYaw + this.gaze.angle);
     if (this.phase === 'deciding') this.#decisionClock();
     // Fast gaze shifts blur the picture (judged on screen speed, so slow motion blurs less).
@@ -579,8 +597,8 @@ export class Training {
       <div class="card replay">
         <div class="answer-label">What happens next</div>
         <div class="call-buttons">
-          <button class="choice-btn${on('yours')}" data-train="replay-mine">▶ Your choice</button>
-          <button class="choice-btn${on('best')}" data-train="replay-best">▶ The best option</button>
+          <button class="choice-btn${on('yours')}" data-train="replay-mine">${ICON.play} Your choice</button>
+          <button class="choice-btn${on('best')}" data-train="replay-best">${ICON.play} The best option</button>
           ${r?.data ? '<button class="link-btn" data-train="replay-off">Back to the picture</button>' : ''}
         </div>
         ${body}${dribbleNote}
@@ -599,12 +617,13 @@ export class Training {
     v.drawSides(this.#sides());
     v.ctx.save();
     drawScanCones(v, this.samples, this.halfAngle);
-    drawLanes(v, geometry.teammates, me, positions);
+    const unchecked = drawUnchecked(v, me, this.samples, this.halfAngle, result.missed, positions);
     drawDecision(v, best, geometry, me, positions);
+    const sameAsBest = this.#sameAsBest();
     if (this.choice.action === 'dribble' && this.choice.spot) {
       // Your carry: dashed ink to where you chose to take the ball.
       arrow(v, me, this.choice.spot, { color: COLORS.ink, width: 3, dash: [10, 6] }, true);
-    } else if (!this.#sameAsBest()) {
+    } else if (!sameAsBest) {
       const mine = { action: this.choice.action, target_player_id: this.choice.target };
       drawDecision(v, mine, geometry, me, positions, COLORS.ink);
     }
@@ -612,6 +631,58 @@ export class Training {
     v.ctx.restore();
     v.drawPlayers(frame.players, { selectedId: this.trial.receiver });
     v.drawBall(frame.ball);
+
+    // Labels last, so no dot covers them.
+    const goal = { x: geometry.attacking === 'right' ? 100 : 0, y: 50 };
+    const spotOf = (d) => (d.action === 'pass' ? positions.get(d.target_player_id) : d.action === 'shoot' ? goal : d.spot ?? geometry.free_space);
+    const bestAt = spotOf({ ...best, spot: geometry.free_space });
+    if (bestAt) {
+      const free = best.action === 'pass' && geometry.teammates.find((t) => t.id === best.target_player_id)?.open;
+      const what = best.action === 'pass' ? `#${best.target_player_id}${free ? ' FREE' : ''}` : best.action.toUpperCase();
+      // Above the receiver, unless the "MISSED" tag is there already (you missed the best option).
+      const missedBest = result.missed.some((m) => m.id === best.target_player_id);
+      drawPitchTag(v, bestAt, `BEST · ${what}`, 'best', best.action !== 'pass' ? 'below' : missedBest ? 'right' : 'above');
+    }
+    if (!sameAsBest) {
+      const pickAt = spotOf({ action: this.choice.action, target_player_id: this.choice.target, spot: this.choice.spot });
+      if (pickAt) drawPitchTag(v, pickAt, 'YOUR PICK', 'pick', 'below');
+    }
+    for (const m of result.missed) {
+      const p = positions.get(m.id);
+      if (p) drawPitchTag(v, p, `${m.noticed ? 'ONLY GLIMPSED' : 'MISSED'} · ${this.#keyName(p).toUpperCase()}`, m.noticed ? 'glimpsed' : 'missed');
+    }
+    drawPitchTag(v, me, 'YOU', 'you');
+    const legend = this.page.querySelector('.legend-unchecked');
+    if (legend) legend.hidden = !unchecked;
+  }
+
+  /** "#7" for a teammate, "Red 2" for an opponent. */
+  #keyName(p) {
+    return p.team === this.trial.team ? `#${p.id}` : `${this.scenario.teams[p.team].name} ${p.id}`;
+  }
+
+  /**
+   * The part of the pitch the drill uses, about twice as wide as tall, so the dots are big
+   * and the cards under it stay on screen. Null (the whole pitch) when the players fill it.
+   */
+  #revealWindow() {
+    const pts = this.scenario.frames[this.trial.arrival_frame].players.map((p) => toM(p.x, p.y));
+    const PAD = 8;
+    const ASPECT = NARROW.matches ? 1.35 : 2; // a phone gets a taller picture, so the labels have room
+    const FULL = { x: -4, y: -4, w: 113, h: 76 }; // the pitch plus its run-off, as PitchView draws it
+    const x0 = Math.min(...pts.map(([x]) => x)) - PAD;
+    const x1 = Math.max(...pts.map(([x]) => x)) + PAD;
+    const y0 = Math.min(...pts.map(([, y]) => y)) - PAD;
+    const y1 = Math.max(...pts.map(([, y]) => y)) + PAD;
+    const w = Math.max(60, x1 - x0, (y1 - y0) * ASPECT); // never closer than 60 m across: keep the context
+    if (w > FULL.w) return null;
+    const h = w / ASPECT;
+    return {
+      x: clamp((x0 + x1 - w) / 2, FULL.x, FULL.x + FULL.w - w),
+      y: clamp((y0 + y1 - h) / 2, FULL.y, FULL.y + FULL.h - h),
+      w,
+      h,
+    };
   }
 
   #sameAsBest() {
@@ -623,10 +694,15 @@ export class Training {
     const pb = this.playback;
     const left = (pb.end - pb.t) / pb.speed;
     const total = (pb.end - pb.start) / pb.speed;
-    this.hud.querySelector('#hud-scans').textContent = `Scans ${this.scans}`;
-    this.hud.querySelector('#hud-aim').textContent = `/ aim ${this.#targetScans()}`;
-    this.hud.querySelector('#hud-time').textContent = `${left.toFixed(1)} s`;
-    this.hud.querySelector('#hud-bar-fill').style.width = `${(left / total) * 100}%`;
+    // Write only what changed, and move the bar with a transform: this runs every frame.
+    const set = (sel, text) => {
+      const node = this.hud.querySelector(sel);
+      if (node.textContent !== text) node.textContent = text;
+    };
+    set('#hud-scans', `Scans ${this.scans}`);
+    set('#hud-aim', `/ aim ${this.#targetScans()}`);
+    set('#hud-time', `${left.toFixed(1)} s`);
+    this.hud.querySelector('#hud-bar-fill').style.transform = `scaleX(${Math.max(0, left / total).toFixed(3)})`;
     // Compass: up is the ball; the needle is where your eyes point.
     const gazeFromBall = wrap(this.bodyYaw + this.gaze.angle - this.ballYaw);
     this.hud.querySelector('#hud-needle').setAttribute('transform', `rotate(${gazeFromBall} 20 20)`);
@@ -674,7 +750,7 @@ export class Training {
     if (reveal) {
       this.page.innerHTML = this.#revealHtml();
       const canvas = this.page.querySelector('#reveal-pitch');
-      this.view = canvas ? new PitchView(canvas) : null;
+      this.view = canvas ? new PitchView(canvas, this.#revealWindow()) : null;
       return;
     }
     this.view = null;
@@ -726,18 +802,6 @@ export class Training {
       </div>`;
   }
 
-  #playerRow() {
-    const p = profiles.currentProfile();
-    if (!p) return '';
-    return `
-      <div class="player-row">
-        <span class="initial">${esc(p.name.charAt(0).toUpperCase())}</span>
-        <strong>${esc(p.name)}</strong><span class="badge-dot" style="background:${safeColour(p.colour)}"></span>
-        ${p.demo ? '<span class="sub">sample history</span>' : ''}
-        <button class="link-btn" data-train="switch">Switch player</button>
-      </div>`;
-  }
-
   #briefHtml() {
     const { me, teamName } = this.#who();
     const choices = this.trials.filter((t) => t.kind !== 'drill' || t.level === this.level);
@@ -752,11 +816,9 @@ export class Training {
     const size = this.trial.kind === 'drill'
       ? `<strong>${mine} v ${players.length - mine}</strong> ${esc(LEVEL_NAMES[this.trial.level] ?? '')} small-sided game, with a keeper and a back line`
       : `<strong>${mine} v ${players.length - mine}</strong> a moment from the match`;
+    // Setup keeps the view open: a slim player pill on top, one low card along the bottom.
     return `
-      <div class="float area-tl">
-        ${this.#playerRow()}
-        ${this.#focusInner(true)}
-      </div>
+      <div class="float setup-pill area-tl">${this.#setupPill()}</div>
       <div class="float howto area-tr">
         <span class="kicker">How to play</span>
         <span class="key"><kbd>←</kbd><kbd>A</kbd> / <kbd>→</kbd><kbd>D</kbd> Shoulder check <small>tap ~90°</small></span>
@@ -764,31 +826,54 @@ export class Training {
         <span class="key"><kbd>↑</kbd><kbd>W</kbd> Open body</span>
         <span class="key"><kbd>let go</kbd> Look back</span>
       </div>
-      <div class="float brief-card area-bl">
-        <h2>Player's Eye training</h2>
-        <div class="sub">See it like a player, then check it with the eagle eye. Train ${this.minEvidence} drills and EagleEye learns how you scan.</div>
-        <ul class="brief-rows">
-          <li><span class="ico">${ICON.people}</span><span>${size}. Fewer players than a match, so you can learn to scan.</span></li>
-          <li><span class="ico">${ICON.target}</span><span><strong>You are ${esc(teamName)} #${me.id}</strong> ${esc(me.role)}. #${this.trial.passer} is about to pass to you.</span></li>
-          <li><span class="ico">${ICON.eye}</span><span><strong>Scan first</strong> before the ball arrives, then choose what to do.</span></li>
-        </ul>
-        <details class="why-scan"><summary>Why scan?</summary>${researchText()}</details>
-      </div>
-      <div class="float level-card area-br">
-        <div class="answer-label">Level</div>
-        <div class="seg" role="radiogroup" aria-label="Level">
-          ${Object.keys(LEVEL_NAMES).map((k) => `<button role="radio" aria-checked="${k === this.level}" class="${k === this.level ? 'on' : ''}" data-train="level" data-level="${k}" title="${esc(this.levels[k].label)}">${LEVEL_NAMES[k]}</button>`).join('')}
+      <div class="float setup-dock">
+        <div class="dock-brief">
+          <h2>Player's Eye training</h2>
+          <ul class="brief-rows">
+            <li><span class="ico">${ICON.target}</span><span><strong>You are ${esc(teamName)} #${me.id}</strong>, ${esc(me.role)}. #${this.trial.passer} passes to you.</span></li>
+            <li><span class="ico">${ICON.eye}</span><span><strong>Scan first</strong> before the ball arrives, then choose.</span></li>
+            <li><span class="ico">${ICON.people}</span><span>${size}</span></li>
+          </ul>
+          <details class="why-scan"><summary>Why scan?</summary>${researchText()}</details>
         </div>
-        <div class="level-chips">
-          <span class="chip">${esc(l.label)}</span>
-          <span class="chip">${Math.round(l.speed * 100)}% speed</span>
-          <span class="chip">aim for ${n} scan${n === 1 ? '' : 's'}</span>
-          <span class="chip">${l.decision_s ? `${l.decision_s} s to decide` : 'no decision clock'}</span>
+        <div class="dock-level">
+          <div class="seg" role="radiogroup" aria-label="Level">
+            ${Object.keys(LEVEL_NAMES).map((k) => `<button role="radio" aria-checked="${k === this.level}" class="${k === this.level ? 'on' : ''}" data-train="level" data-level="${k}" title="${esc(this.levels[k].label)}">${LEVEL_NAMES[k]}</button>`).join('')}
+          </div>
+          <p class="level-note">${esc(l.label)} · ${Math.round(l.speed * 100)}% speed · aim for ${n} scan${n === 1 ? '' : 's'} · ${l.decision_s ? `${l.decision_s} s to decide` : 'no decision clock'}</p>
+          <div class="dock-start">
+            <select id="trial-select" aria-label="Drill">${options}</select>
+            <button class="primary-btn" data-train="start">${ICON.play} Start drill</button>
+          </div>
         </div>
-        <label class="answer-label" for="trial-select">Drill</label>
-        <select id="trial-select">${options}</select>
-        <button class="primary-btn" data-train="start">▶ Start drill</button>
       </div>`;
+  }
+
+  /** Who's playing and what EagleEye has learnt so far, in one line. */
+  #setupPill() {
+    const p = profiles.currentProfile();
+    const done = profiles.loadHistory().length;
+    const need = this.minEvidence;
+    const rec = this.recommendation;
+    const who = p
+      ? `<span class="initial">${esc(p.name.charAt(0).toUpperCase())}</span><strong>${esc(p.name)}</strong>
+         <span class="badge-dot" style="background:${safeColour(p.colour)}"></span>${p.demo ? '<span class="sub">sample</span>' : ''}`
+      : '';
+    let learn;
+    if (done < need) {
+      const dots = Array.from({ length: need }, (_, i) => `<span class="${i < done ? 'done' : i === done ? 'now' : ''}"></span>`).join('');
+      learn = `<span class="learn" title="After ${need} drills EagleEye finds your weak spot (like a blind shoulder) and picks the next drill to train it.">
+        <span class="dots" aria-hidden="true">${dots}</span>Drill ${done + 1} of ${need} · getting to know you</span>`;
+    } else {
+      learn = rec?.focus
+        ? `<span class="learn" title="${esc(rec.focus.detail)}">Your focus: <strong class="focus-label">${esc(rec.focus.label)}</strong></span>`
+        : '<span class="learn">No weak spot right now</span>';
+      if (rec?.next_trial_id) learn += `<button class="link-btn" data-train="next-for-you">Next drill for you ${ICON.arrow}</button>`;
+      if (rec?.level_suggestion) {
+        learn += `<button class="link-btn" data-train="level-suggest" data-level="${rec.level_suggestion.to}" title="${esc(rec.level_suggestion.reason)}">Try ${LEVEL_NAMES[rec.level_suggestion.to]}</button>`;
+      }
+    }
+    return `${who}<span class="pill-sep" aria-hidden="true"></span>${learn}<button class="link-btn" data-train="switch">Switch</button>`;
   }
 
   /**
@@ -819,7 +904,7 @@ export class Training {
            <button class="choice-btn" data-train="level-suggest" data-level="${rec.level_suggestion.to}">Switch to ${LEVEL_NAMES[rec.level_suggestion.to]}</button></p>`
       : '';
     const button = withButton && rec.next_trial_id
-      ? '<button class="primary-btn" data-train="next-for-you">Next drill for you →</button>'
+      ? `<button class="primary-btn" data-train="next-for-you">Next drill for you ${ICON.arrow}</button>`
       : '';
     const head = rec.focus
       ? `<p style="margin:6px 0"><span class="focus-label">${esc(rec.focus.label)}</span><br><span class="sub">${esc(rec.focus.detail)}</span></p>`
@@ -846,13 +931,14 @@ export class Training {
   #decidingHtml() {
     const dribbling = this.decideMode === 'dribble';
     const limit = this.levels[this.level].decision_s;
+    // No clock on Rookie: the top pill says so, the card stays short.
     const clock = limit
       ? '<div class="decide-clock"><div class="bar"><div id="decide-clock-fill"></div></div><div id="decide-clock-label" class="sub"></div></div>'
-      : `<div class="decide-clock sub">No clock on ${LEVEL_NAMES[this.level]}</div>`;
+      : '';
     const actions = dribbling
       ? `<p><strong>Dribble:</strong> click the grass to carry the ball there (up to ${MAX_CARRY_M} m), or a teammate you saw to carry towards them.</p>
          <div class="decide-actions"><button class="choice-btn" data-train="cancel-dribble">Back to passing</button></div>`
-      : `<p>Decide from what you saw. Click a teammate on the pitch to pass, or tap one you remember.</p>
+      : `<p>Click a teammate on the pitch to pass, or tap one you saw.</p>
          <div class="decide-actions">
            <button class="choice-btn" data-train="dribble">${ICON.arrow} Dribble…</button>
            <button class="choice-btn" data-train="shoot">${ICON.target} Shoot</button>
@@ -860,7 +946,6 @@ export class Training {
     return `
       <div class="float decide-card">
         <div>
-          <div class="decide-status">Ball at your feet · ${this.scans} scan${this.scans === 1 ? '' : 's'} made</div>
           <h2>The ball is at your feet. What now?</h2>
           ${actions}
           ${clock}
@@ -929,23 +1014,22 @@ export class Training {
           <p>You answered first. Now see the whole pitch from above.</p>
         </div>
         <div class="reveal-actions">
-          <button class="choice-btn" data-train="retry">↻ Try this one again</button>
-          <button class="${nextForYou ? 'choice-btn' : 'primary-btn'}" data-train="next">Random drill</button>
-          ${nextForYou ? '<button class="primary-btn" data-train="next-for-you">Next drill for you →</button>' : ''}
+          <button class="choice-btn" data-train="retry">${ICON.retry} Try this one again</button>
+          <button class="${nextForYou ? 'choice-btn' : 'primary-btn'}" data-train="next">${ICON.dice} Random drill</button>
+          ${nextForYou ? `<button class="primary-btn" data-train="next-for-you">Next drill for you ${ICON.arrow}</button>` : ''}
         </div>
       </div>
       <div class="reveal-grid">
         <div class="reveal-main">
           <div class="card">
-            <div class="bird-head"><h2>Bird's-eye view</h2><span class="chip unlocked">✓ Unlocked after your answer</span></div>
-            <div class="bird-wrap"><canvas id="reveal-pitch" aria-label="The whole pitch from above"></canvas></div>
+            <div class="bird-head"><h2>Bird's-eye view</h2><span class="chip unlocked">${ICON.check} Unlocked after your answer</span></div>
+            <div class="bird-wrap"><canvas id="reveal-pitch" aria-label="The drill from above: where you looked, the best option and who you missed"></canvas></div>
             <ul class="bird-legend">
               <li><span class="line decision"></span>Best option</li>
               ${sameAsBest ? '' : '<li><span class="line yours"></span>Your pick</li>'}
               <li><span class="cone"></span>Where you looked</li>
               ${result.missed.length ? '<li><span class="ring"></span>Missed</li>' : ''}
-              <li><span class="line open"></span>Open pass</li>
-              <li><span class="line blocked"></span>Lane blocked</li>
+              <li class="legend-unchecked" hidden><span class="hatch"></span>Not checked</li>
             </ul>
           </div>
           <div class="reveal-row">
@@ -969,14 +1053,28 @@ export class Training {
             <div class="saw-chips">${chips || '<span class="sub">No key players in this moment.</span>'}</div>
             ${result.missed.length ? '' : '<p class="missed ok">You identified every key player. That\'s an eagle eye!</p>'}
           </div>
-          <div class="card agent-card">
-            <div class="coach-head"><span class="step">C</span><div><h3>${esc(debrief.agent)}</h3>
-              <div class="sub">Your coach's debrief · ${debrief.source === 'foundry' ? 'Microsoft Foundry agent' : 'Offline coach'} · ${(debrief.latency_ms / 1000).toFixed(1)} s</div></div></div>
+          <div class="card agent-card coach-card">
+            <div class="coach-head"><span class="step">C</span><div><h3>Coach</h3>
+              <div class="sub">Your debrief · ${debrief.source === 'foundry' ? `${esc(debrief.agent)} on Microsoft Foundry` : 'Offline coach'} · ${(debrief.latency_ms / 1000).toFixed(1)} s</div></div></div>
             ${debrief.status === 'fallback' ? `<div class="warning">Foundry call failed. Showing offline text instead.<br>${esc(debrief.error ?? '')}</div>` : ''}
-            <p class="coach-text">${esc(debrief.output)}</p>
+            <blockquote class="coach-text">${esc(unquote(debrief.output))}</blockquote>
+            ${this.#clarityHtml()}
           </div>
-          ${clarityCard(this.clarity)}
         </div>
+      </div>`;
+  }
+
+  /** "Did you understand?" at the foot of the coach's card. Unclear debriefs go to the coach to review. */
+  #clarityHtml() {
+    const c = this.clarity;
+    if (c?.sent) return `<div class="coach-foot"><span class="thanks">${ICON.check} ${esc(c.message)}</span></div>`;
+    const busy = c?.sending ? 'disabled' : '';
+    return `
+      <div class="coach-foot">
+        <span class="label">Did you understand?</span>
+        <button class="choice-btn" data-clarity="yes" ${busy}>${ICON.check} Got it</button>
+        <button class="choice-btn" data-clarity="no" ${busy} title="Unclear debriefs go to the coach to review. They never change what the agents know.">Not really</button>
+        ${c?.error ? `<div class="warning">${esc(c.error)}</div>` : ''}
       </div>`;
   }
 
@@ -1258,6 +1356,11 @@ function safeColour(c) {
 
 function capitalise(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** The card draws its own quote marks, so drop any the model wrapped round its reply. */
+function unquote(s) {
+  return String(s).trim().replace(/^["“”']+|["“”']+$/g, '').trim();
 }
 
 function esc(s) {

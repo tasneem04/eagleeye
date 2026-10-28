@@ -24,29 +24,31 @@ export const COLORS = {
 const LABEL_INK = { '#2563eb': '#1d4ed8', '#ef4444': '#b91c1c' };
 
 export class PitchView {
-  constructor(canvas) {
+  /** `win` (metres: { x, y, w, h }) shows only that part of the pitch; null shows all of it. */
+  constructor(canvas, win = null) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
+    this.win = win;
     this.resize();
   }
 
   resize() {
+    const win = this.win ?? { x: -MARGIN, y: -MARGIN, w: PITCH_LENGTH + 2 * MARGIN, h: PITCH_WIDTH + 2 * MARGIN };
     const cssWidth = this.canvas.parentElement.clientWidth;
-    const totalW = PITCH_LENGTH + 2 * MARGIN;
-    const totalH = PITCH_WIDTH + 2 * MARGIN;
-    const cssHeight = (cssWidth * totalH) / totalW;
+    const cssHeight = (cssWidth * win.h) / win.w;
     this.dpr = window.devicePixelRatio || 1;
     this.canvas.width = Math.round(cssWidth * this.dpr);
     this.canvas.height = Math.round(cssHeight * this.dpr);
     this.canvas.style.height = `${cssHeight}px`;
     this.cssWidth = cssWidth;
     this.cssHeight = cssHeight;
-    this.scale = cssWidth / totalW; // css px per metre
+    this.origin = [win.x, win.y];
+    this.scale = cssWidth / win.w; // css px per metre
   }
 
   /** metres -> css px */
   m(mx, my) {
-    return [(mx + MARGIN) * this.scale, (my + MARGIN) * this.scale];
+    return [(mx - this.origin[0]) * this.scale, (my - this.origin[1]) * this.scale];
   }
 
   /** scenario units (0-100) -> css px */
@@ -56,11 +58,11 @@ export class PitchView {
 
   /** css px -> scenario units (0-100) */
   toUnits(px, py) {
-    return [((px / this.scale - MARGIN) * 100) / PITCH_LENGTH, ((py / this.scale - MARGIN) * 100) / PITCH_WIDTH];
+    return [((px / this.scale + this.origin[0]) * 100) / PITCH_LENGTH, ((py / this.scale + this.origin[1]) * 100) / PITCH_WIDTH];
   }
 
   get playerRadius() {
-    return Math.max(9, PLAYER_RADIUS * this.scale);
+    return Math.min(15, Math.max(9, PLAYER_RADIUS * this.scale)); // a zoomed view keeps the dots readable, not huge
   }
 
   begin() {
@@ -132,10 +134,11 @@ export class PitchView {
       ctx.restore();
     }
     if (arrow) {
-      const [cx] = this.m(PITCH_LENGTH / 2, 0);
+      // Over the halfway line on the whole pitch; at the top centre of a zoomed view.
+      const cx = this.win ? this.cssWidth / 2 : this.m(PITCH_LENGTH / 2, 0)[0];
       const text = arrow.dir === 'right' ? `${arrow.text}  →` : `←  ${arrow.text}`;
       const w = ctx.measureText(text).width + 16;
-      const y = (MARGIN * this.scale) / 2;
+      const y = this.win ? size * 1.4 : (MARGIN * this.scale) / 2;
       pill(ctx, cx - w / 2, y - size * 0.75, w, size * 1.5);
       ctx.fillStyle = LABEL_INK[arrow.color] ?? arrow.color;
       ctx.fillText(text, cx, y + 0.5);

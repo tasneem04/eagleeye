@@ -619,7 +619,7 @@ body.train-mode #analyse-view, body.progress-mode #analyse-view { display: none;
 .hud-sep { width: 1px; height: 20px; background: var(--border); }
 .hud-label { color: var(--muted); }
 .hud-bar { width: 150px; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
-#hud-bar-fill { height: 100%; width: 100%; background: var(--accent); }
+#hud-bar-fill { height: 100%; width: 100%; background: var(--accent); transform-origin: left center; }
 .hud-time { font-variant-numeric: tabular-nums; min-width: 42px; text-align: right; }
 .hud-keys {
   position: absolute; left: 20px; bottom: 20px; display: flex; align-items: center; gap: 6px;
@@ -745,6 +745,127 @@ body.train-mode #analyse-view, body.progress-mode #analyse-view { display: none;
 .scout-unlock .scout-meta { flex-basis: 100%; }
 .scout-unlock input, .scout-research input { flex: 1; min-width: 160px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--pill); padding: 7px 14px; font-size: 13px; }
 .scout-clarity { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 6px; }
+
+/* ---- Train: polish to the red design ------------------------------------------- */
+/* Line icons inside buttons and chips */
+.reveal-actions svg, .call-buttons svg, .coach-foot svg, .chip.unlocked svg, .focus-card .primary-btn svg {
+  width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+}
+.call-buttons svg.solid { fill: currentColor; stroke: none; width: 14px; height: 14px; }
+.dock-start .primary-btn svg { width: 15px; height: 15px; fill: currentColor; }
+.setup-pill .link-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.4; vertical-align: -2px; }
+.chip.unlocked { display: inline-flex; align-items: center; gap: 4px; }
+.chip.unlocked svg { width: 12px; height: 12px; stroke-width: 3; }
+
+/* Setup: the view stays open. A slim pill on top (who's playing, what EagleEye has learnt),
+   one low card along the bottom (the brief, the level, the drill, Start). */
+.train-view .train-layer.brief {
+  grid-template-columns: auto 1fr; grid-template-rows: auto 1fr auto;
+  grid-template-areas: "tl tr" ". ." "dock dock";
+}
+.setup-pill {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 7px 10px 7px 7px; border-radius: var(--pill); font-size: 14px; max-width: 640px;
+}
+.setup-pill .initial {
+  width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
+  font-weight: 700; color: var(--accent); background: var(--accent-light);
+}
+.setup-pill .pill-sep { width: 1px; height: 20px; background: var(--border); }
+.setup-pill .learn { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+.setup-pill .learn strong { color: var(--accent); }
+.setup-pill .dots { display: inline-flex; gap: 4px; }
+.setup-pill .dots span { width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--border); }
+.setup-pill .dots .done { background: var(--accent); border-color: var(--accent); }
+.setup-pill .dots .now { border-color: var(--accent); }
+.setup-pill .link-btn { white-space: nowrap; }
+.train-view .howto { font-size: 13px; gap: 8px 12px; padding: 8px 16px; flex-wrap: nowrap; white-space: nowrap; }
+
+.setup-dock {
+  grid-area: dock; justify-self: center; width: min(1080px, 100%);
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 28px; align-items: center;
+  padding: 16px 22px;
+}
+.setup-dock h2 { font-size: 19px !important; margin: 0 0 8px !important; }
+.setup-dock .brief-rows { margin: 0; gap: 6px; }
+.setup-dock .brief-rows li { align-items: center; font-size: 14px; }
+.setup-dock .brief-rows .ico { width: 26px; height: 26px; }
+.setup-dock .brief-rows .ico svg { width: 14px; height: 14px; }
+.setup-dock .why-scan { margin-top: 8px; }
+.dock-level .seg { display: flex; gap: 4px; padding: 3px; border-radius: var(--pill); background: var(--surface-2); border: 1px solid var(--border); }
+.dock-level .seg button { min-height: 36px; }
+.level-note { margin: 8px 4px 10px; font-size: 12px; color: var(--muted); }
+.dock-start { display: flex; gap: 10px; }
+.dock-start select { flex: 1; min-width: 0; min-height: 46px; border-radius: var(--pill); }
+.dock-start .primary-btn { min-height: 46px; padding: 10px 22px; white-space: nowrap; }
+#trial-select {
+  appearance: none; -webkit-appearance: none; padding-right: 40px; cursor: pointer;
+  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231d1416' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 14px center / 16px;
+}
+#trial-select:hover { border-color: var(--muted-2); }
+
+/* Choose: a shorter card, so more of the view shows above it */
+.train-view .decide-card { padding: 16px 22px; gap: 24px; width: min(1000px, 100%); }
+.train-view .decide-card h2 { font-size: 21px !important; margin: 0 0 4px !important; }
+.train-view .decide-card p { margin: 0 0 12px; font-size: 14px; }
+.train-view .decide-actions .choice-btn { min-height: 44px; }
+.train-view .saw { min-height: 40px; padding: 4px 12px 4px 4px; }
+.train-view .saw .dot { width: 28px; height: 28px; }
+.train-view .lock-line { margin-top: 8px; padding: 7px 12px; }
+
+/* Choose: the top pill turns into a status line (scans, ball at your feet, the clock) */
+.hud-decide-only { display: none; }
+.train-hud.deciding .hud-decide-only { display: block; }
+.train-hud.deciding .hud-compass, .train-hud.deciding .hud-bar, .train-hud.deciding .hud-time,
+.train-hud.deciding .hud-keys, .train-hud.deciding .hud-touch { display: none; }
+.train-hud.deciding .hud-pill-bar { padding-left: 16px; }
+
+/* Reveal: legend swatches for the new marks */
+.bird-legend .cone { background: rgba(29, 20, 22, 0.2); }
+.bird-legend .hatch {
+  width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(29, 20, 22, 0.25);
+  background: repeating-linear-gradient(135deg, rgba(29, 20, 22, 0.35) 0 1.5px, transparent 1.5px 5px);
+}
+.bird-legend li[hidden] { display: none; }
+
+/* Reveal: the coach's card fills the column, quote in the middle, "Did you understand?" at the foot */
+.reveal-side { align-self: stretch; grid-template-rows: auto 1fr; }
+.coach-card { display: flex; flex-direction: column; }
+blockquote.coach-text { margin: 0; quotes: "\201C" "\201D"; }
+blockquote.coach-text::before { content: open-quote; }
+blockquote.coach-text::after { content: close-quote; }
+.coach-foot {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: auto; padding-top: 18px;
+}
+.coach-foot .label { font-weight: 700; font-size: 14px; margin-right: auto; }
+.coach-foot .choice-btn { min-height: 40px; padding: 7px 16px; font-size: 14px; }
+.coach-foot .choice-btn:disabled { opacity: 0.6; cursor: default; }
+.coach-foot .thanks { display: inline-flex; align-items: center; gap: 6px; color: var(--ok); font-size: 14px; font-weight: 600; }
+.coach-foot .warning { flex-basis: 100%; }
+
+@media (max-width: 1100px) {
+  /* One column: the score straight under the picture, then the replay and the focus */
+  .reveal-main { display: contents; }
+  .reveal-main > .card { order: 1; }
+  .reveal-side { order: 2; }
+  .reveal-row { order: 3; }
+}
+@media (max-width: 1360px) {
+  .train-view .area-tr { display: none; } /* the scan HUD still shows the keys */
+}
+@media (max-width: 1200px) {
+  .train-view .train-layer.brief { grid-template-columns: 1fr; grid-template-areas: "tl" "." "dock"; }
+}
+@media (max-width: 760px) {
+  /* minmax(0, …): a long drill name in the dropdown must not widen the card past the screen */
+  .setup-dock { grid-template-columns: minmax(0, 1fr); gap: 16px; width: 100%; min-width: 0; }
+  .setup-pill { border-radius: var(--radius); }
+  .setup-pill .pill-sep { display: none; }
+  .train-hud.deciding .hud-sep:not(.hud-decide-only) { display: none; } /* its label is hidden here */
+  .coach-foot .label { flex-basis: 100%; }
+  .coach-foot .choice-btn { flex: 1; }
+}
 
 /* ---- Responsive -------------------------------------------------------------- */
 @media (max-width: 1200px) {
